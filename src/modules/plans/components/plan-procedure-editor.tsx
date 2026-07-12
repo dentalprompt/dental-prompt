@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -26,6 +27,7 @@ export function PlanProcedureEditor({
     notes: procedure.notes ?? ""
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function saveChanges() {
     setIsSaving(true);
@@ -47,6 +49,19 @@ export function PlanProcedureEditor({
       router.refresh();
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function deleteProcedure() {
+    setIsDeleting(true);
+
+    try {
+      await fetch(`/api/plans/${planId}/procedures/${procedure.id}`, {
+        method: "DELETE"
+      });
+      router.refresh();
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -101,7 +116,11 @@ export function PlanProcedureEditor({
           <Input value={form.notes} onChange={(event) => setForm((state) => ({ ...state, notes: event.target.value }))} />
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" onClick={deleteProcedure} disabled={isDeleting}>
+            <Trash2 className="mr-2 size-4" />
+            {isDeleting ? "Excluindo..." : "Excluir"}
+          </Button>
           <Button onClick={saveChanges} disabled={isSaving}>
             {isSaving ? "Salvando..." : "Salvar alteracoes"}
           </Button>

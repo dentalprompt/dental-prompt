@@ -2,6 +2,7 @@ import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockPlanDetails, mockPlans } from "@/modules/plans/data/mock-plans";
 import type {
+  CreateProcedureInput,
   CreatePlanInput,
   PlanDetail,
   PlanListItem,
@@ -216,6 +217,87 @@ export async function updatePlanProcedure(
     usesToothFaces: procedure.usesToothFaces,
     notes: procedure.notes
   };
+}
+
+export async function createPlanProcedure(planId: string, input: CreateProcedureInput) {
+  if (!process.env.DATABASE_URL) {
+    return {
+      id: `mock_proc_${Date.now()}`,
+      specialty: input.specialty,
+      name: input.name,
+      price: input.price,
+      cost: input.cost,
+      isActive: input.isActive ?? true,
+      usesToothFaces: input.usesToothFaces ?? false,
+      notes: input.notes ?? null
+    };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const plan = await prisma.plan.findUnique({
+    where: { id: planId },
+    select: { tenantId: true }
+  });
+
+  if (!plan || plan.tenantId !== tenantId) {
+    return null;
+  }
+
+  const procedure = await prisma.planProcedure.create({
+    data: {
+      planId,
+      specialty: input.specialty,
+      name: input.name,
+      price: input.price,
+      cost: input.cost,
+      isActive: input.isActive ?? true,
+      usesToothFaces: input.usesToothFaces ?? false,
+      notes: input.notes || null
+    }
+  });
+
+  return {
+    id: procedure.id,
+    specialty: procedure.specialty,
+    name: procedure.name,
+    price: Number(procedure.price),
+    cost: Number(procedure.cost),
+    isActive: procedure.isActive,
+    usesToothFaces: procedure.usesToothFaces,
+    notes: procedure.notes
+  };
+}
+
+export async function deletePlanProcedure(planId: string, procedureId: string) {
+  if (!process.env.DATABASE_URL) {
+    return { id: procedureId };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const plan = await prisma.plan.findUnique({
+    where: { id: planId },
+    select: { tenantId: true }
+  });
+
+  if (!plan || plan.tenantId !== tenantId) {
+    return null;
+  }
+
+  await prisma.planProcedure.delete({
+    where: { id: procedureId }
+  });
+
+  return { id: procedureId };
 }
 
 export async function updatePlan(id: string, input: UpdatePlanInput): Promise<PlanListItem | null> {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getRequestSession } from "@/lib/auth/request-session";
 import { updateProcedureSchema } from "@/modules/plans/schemas/plan-schema";
-import { updatePlanProcedure } from "@/modules/plans/services/plan-service";
+import { deletePlanProcedure, updatePlanProcedure } from "@/modules/plans/services/plan-service";
 
 export async function PATCH(
   request: Request,
@@ -31,4 +31,24 @@ export async function PATCH(
       { status: 400 }
     );
   }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string; procedureId: string }> }
+) {
+  const session = getRequestSession(request);
+
+  if (!session) {
+    return NextResponse.json({ message: "Sessao invalida." }, { status: 401 });
+  }
+
+  const { id, procedureId } = await params;
+  const result = await deletePlanProcedure(id, procedureId);
+
+  if (!result) {
+    return NextResponse.json({ message: "Procedimento nao encontrado." }, { status: 404 });
+  }
+
+  return NextResponse.json(result);
 }

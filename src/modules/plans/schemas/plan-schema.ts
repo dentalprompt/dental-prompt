@@ -18,3 +18,15 @@ export const updateProcedureSchema = z.object({
 });
 
 export type UpdateProcedureFormValues = z.infer<typeof updateProcedureSchema>;
+
+export const createProcedureSchema = z.object({
+  specialty: z.string().min(2, "Informe a especialidade."),
+  name: z.string().min(3, "Informe o nome do procedimento."),
+  price: z.coerce.number().min(0),
+  cost: z.coerce.number().min(0),
+  isActive: z.boolean().optional(),
+  usesToothFaces: z.boolean().optional(),
+  notes: z.string().optional()
+});
+
+export type CreateProcedureFormValues = z.infer<typeof createProcedureSchema>;

@@ -45,3 +45,13 @@ export type UpdateProcedureInput = {
   usesToothFaces?: boolean;
   notes?: string;
 };
+
+export type CreateProcedureInput = {
+  specialty: string;
+  name: string;
+  price: number;
+  cost: number;
+  isActive?: boolean;
+  usesToothFaces?: boolean;
+  notes?: string;
+};

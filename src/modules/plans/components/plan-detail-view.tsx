@@ -3,6 +3,7 @@ import { ArrowLeft, FileSpreadsheet, ShieldCheck, WalletCards } from "lucide-rea
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlanProcedureCreateDialog } from "@/modules/plans/components/plan-procedure-create-dialog";
 import { PlanProcedureEditor } from "@/modules/plans/components/plan-procedure-editor";
 import type { PlanDetail } from "@/modules/plans/types/plan";
 
@@ -57,11 +58,14 @@ export function PlanDetailView({ plan }: { plan: PlanDetail }) {
       </Card>
 
       <Card className="border-white/70 bg-white/92">
-        <CardHeader>
-          <CardTitle>Especialidades e procedimentos</CardTitle>
-          <CardDescription>
-            Estrutura pronta para pesquisa interna, reajuste em massa, importacao/exportacao e reutilizacao em toda a plataforma.
-          </CardDescription>
+        <CardHeader className="gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle>Especialidades e procedimentos</CardTitle>
+            <CardDescription>
+              Estrutura pronta para pesquisa interna, reajuste em massa, importacao/exportacao e reutilizacao em toda a plataforma.
+            </CardDescription>
+          </div>
+          <PlanProcedureCreateDialog planId={plan.id} />
         </CardHeader>
       </Card>
 

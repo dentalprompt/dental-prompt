@@ -61,16 +61,16 @@ export function Sidebar({
         {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
       </Button>
 
-      <div className="flex justify-center border-b border-white/60 pb-4">
+      <div className="flex justify-center border-b border-white/60 py-2">
         <Image
           src="/brand/dental-prompt-sidebar-logo.png"
           alt="Dental Prompt"
-          width={collapsed ? 56 : 210}
-          height={collapsed ? 56 : 70}
+          width={1013}
+          height={158}
           priority
           className={cn(
             "h-auto object-contain transition-all duration-300",
-            collapsed ? "w-14" : "w-[210px]"
+            collapsed ? "w-14" : "w-[230px]"
           )}
         />
       </div>

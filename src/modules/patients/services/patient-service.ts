@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockPatients } from "@/modules/patients/data/mock-patients";
-import type { CreatePatientInput, PatientListItem } from "@/modules/patients/types/patient";
+import type { CreatePatientInput, PatientListItem, UpdatePatientInput } from "@/modules/patients/types/patient";
 
 function filterMockPatients(search?: string) {
   if (!search) {
@@ -101,6 +101,79 @@ export async function createPatient(input: CreatePatientInput): Promise<PatientL
       chartNumber: input.chartNumber,
       birthDate: input.birthDate ? new Date(input.birthDate) : undefined,
       notes: input.notes
+    }
+  });
+
+  return {
+    id: patient.id,
+    fullName: patient.fullName,
+    chartNumber: patient.chartNumber,
+    cpf: patient.cpf,
+    mobilePhone: patient.mobilePhone,
+    whatsappPhone: patient.whatsappPhone,
+    email: patient.email,
+    birthDate: patient.birthDate?.toISOString() ?? null,
+    status: patient.status,
+    createdAt: patient.createdAt.toISOString()
+  };
+}
+
+export async function updatePatient(id: string, input: UpdatePatientInput): Promise<PatientListItem | null> {
+  if (!process.env.DATABASE_URL) {
+    const patient = mockPatients.find((item) => item.id === id);
+
+    if (!patient) {
+      return null;
+    }
+
+    return {
+      ...patient,
+      fullName: input.fullName,
+      chartNumber: input.chartNumber ?? null,
+      cpf: input.cpf ?? null,
+      mobilePhone: input.mobilePhone ?? null,
+      whatsappPhone: input.whatsappPhone ?? input.mobilePhone ?? null,
+      email: input.email ?? null,
+      birthDate: input.birthDate ?? null
+    };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    throw new Prisma.PrismaClientKnownRequestError("Tenant not found", {
+      code: "P2025",
+      clientVersion: "5"
+    });
+  }
+
+  const existingPatient = await prisma.patient.findUnique({
+    where: {
+      id
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!existingPatient || existingPatient.tenantId !== tenantId) {
+    return null;
+  }
+
+  const patient = await prisma.patient.update({
+    where: {
+      id
+    },
+    data: {
+      fullName: input.fullName,
+      cpf: input.cpf || null,
+      rg: input.rg || null,
+      email: input.email || null,
+      mobilePhone: input.mobilePhone || null,
+      whatsappPhone: input.whatsappPhone || input.mobilePhone || null,
+      chartNumber: input.chartNumber || null,
+      birthDate: input.birthDate ? new Date(input.birthDate) : null,
+      notes: input.notes || null
     }
   });
 

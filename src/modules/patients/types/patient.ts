@@ -22,3 +22,5 @@ export type CreatePatientInput = {
   chartNumber?: string;
   notes?: string;
 };
+
+export type UpdatePatientInput = CreatePatientInput;

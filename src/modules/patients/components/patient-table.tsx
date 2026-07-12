@@ -7,6 +7,7 @@ import type { Route } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PatientEditTrigger } from "@/modules/patients/components/patient-create-dialog";
 import type { PatientListItem } from "@/modules/patients/types/patient";
 
 const statusLabels: Record<PatientListItem["status"], { label: string; variant: "default" | "success" | "warning" | "info" }> = {
@@ -86,10 +87,7 @@ export function PatientTable({ patients }: { patients: PatientListItem[] }) {
                           Ficha
                         </Link>
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <PencilLine className="mr-2 size-4" />
-                        Editar
-                      </Button>
+                      <PatientEditTrigger patient={patient} />
                     </div>
                   </td>
                 </tr>
@@ -127,10 +125,9 @@ export function PatientTable({ patients }: { patients: PatientListItem[] }) {
                     Ficha
                   </Link>
                 </Button>
-                <Button variant="outline" className="sm:flex-1">
-                  <PencilLine className="mr-2 size-4" />
-                  Editar
-                </Button>
+                <div className="sm:flex-1">
+                  <PatientEditTrigger patient={patient} />
+                </div>
               </div>
             </CardContent>
           </Card>

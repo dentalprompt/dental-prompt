@@ -25,8 +25,17 @@ export function ConversationList({
   activeId?: string;
 }) {
   return (
-    <Card className="min-h-[70vh] border-white/70 bg-white/92">
-      <CardContent className="space-y-3 p-4">
+    <Card className="min-h-[72vh] overflow-hidden border-white/70 bg-white/88 backdrop-blur-md">
+      <CardContent className="space-y-0 p-0">
+        <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-950">Conversas</p>
+            <p className="text-xs text-slate-500">
+              {conversations.length} ativa{conversations.length === 1 ? "" : "s"}
+            </p>
+          </div>
+        </div>
+
         {conversations.length ? (
           conversations.map((conversation) => {
             const isActive = conversation.id === activeId;
@@ -36,10 +45,10 @@ export function ConversationList({
                 key={conversation.id}
                 href={`/dashboard/conversas?conversationId=${conversation.id}` as Route}
                 className={cn(
-                  "block rounded-[1.25rem] border p-4 transition",
+                  "block border-b border-border/60 px-4 py-4 transition last:border-b-0",
                   isActive
-                    ? "border-primary bg-accent/60"
-                    : "border-border bg-background hover:border-primary/30 hover:bg-accent/30"
+                    ? "bg-primary/10"
+                    : "bg-white/35 hover:bg-white/55"
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -82,7 +91,7 @@ export function ConversationList({
             );
           })
         ) : (
-          <div className="flex min-h-40 items-center justify-center text-center text-sm text-slate-500">
+          <div className="flex min-h-40 items-center justify-center p-6 text-center text-sm text-slate-500">
             Nenhuma conversa encontrada para os filtros atuais.
           </div>
         )}

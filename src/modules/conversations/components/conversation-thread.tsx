@@ -46,8 +46,8 @@ export function ConversationThread({ conversation }: { conversation: Conversatio
 
   if (!conversation) {
     return (
-      <Card className="min-h-[70vh] border-white/70 bg-white/92">
-        <CardContent className="flex min-h-[70vh] items-center justify-center p-8 text-center text-sm text-slate-500">
+      <Card className="min-h-[72vh] border-white/70 bg-white/88 backdrop-blur-md">
+        <CardContent className="flex min-h-[72vh] items-center justify-center p-8 text-center text-sm text-slate-500">
           Selecione uma conversa para visualizar as mensagens e interagir com o contato.
         </CardContent>
       </Card>
@@ -55,13 +55,20 @@ export function ConversationThread({ conversation }: { conversation: Conversatio
   }
 
   return (
-    <Card className="min-h-[70vh] border-white/70 bg-white/92">
-      <CardHeader className="border-b border-border/70">
-        <CardTitle>{conversation.contactName}</CardTitle>
-        <CardDescription>{conversation.contactPhone}</CardDescription>
+    <Card className="min-h-[72vh] overflow-hidden border-white/70 bg-white/88 backdrop-blur-md">
+      <CardHeader className="border-b border-border/70 bg-white/45 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle>{conversation.contactName}</CardTitle>
+            <CardDescription>{conversation.contactPhone}</CardDescription>
+          </div>
+          <div className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white">
+            {conversation.messages.length} mensagem{conversation.messages.length === 1 ? "" : "ens"}
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="flex min-h-[calc(70vh-92px)] flex-col p-0">
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <CardContent className="flex min-h-[calc(72vh-92px)] flex-col p-0">
+        <div className="flex-1 space-y-4 overflow-y-auto bg-white/20 p-5">
           {conversation.messages.map((message) => (
             <div
               key={message.id}
@@ -72,7 +79,7 @@ export function ConversationThread({ conversation }: { conversation: Conversatio
                   "max-w-[85%] rounded-[1.25rem] px-4 py-3 text-sm leading-6 shadow-sm",
                   message.direction === "OUTBOUND"
                     ? "bg-primary text-white"
-                    : "bg-background text-slate-700"
+                    : "bg-white text-slate-700"
                 )}
               >
                 <p>{message.content}</p>
@@ -88,13 +95,13 @@ export function ConversationThread({ conversation }: { conversation: Conversatio
             </div>
           ))}
         </div>
-        <div className="border-t border-border/70 p-4">
+        <div className="border-t border-border/70 bg-white/45 p-4 backdrop-blur-sm">
           <div className="space-y-3">
             <Textarea
               value={content}
               onChange={(event) => setContent(event.target.value)}
               placeholder="Escreva uma mensagem..."
-              className="min-h-[90px]"
+              className="min-h-[90px] border-white/70 bg-white/85"
             />
             <div className="flex justify-end">
               <Button onClick={handleSend} disabled={isSending || !content.trim()}>

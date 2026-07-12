@@ -1,8 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { PencilLine } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -19,11 +20,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createAgentSchema, type CreateAgentFormValues } from "@/modules/agents/schemas/agent-schema";
+import type { AgentListItem } from "@/modules/agents/types/agent";
 
-export function AgentCreateDialog() {
+type Props = {
+  agent?: AgentListItem;
+  trigger?: ReactNode;
+};
+
+export function AgentCreateDialog({ agent, trigger }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const isEditing = Boolean(agent);
+
   const {
     register,
     handleSubmit,
@@ -32,22 +41,35 @@ export function AgentCreateDialog() {
   } = useForm<CreateAgentFormValues>({
     resolver: zodResolver(createAgentSchema),
     defaultValues: {
-      name: "",
-      description: "",
-      whatsappNumber: "",
-      model: process.env.NEXT_PUBLIC_DEFAULT_OPENAI_MODEL ?? "gpt-4o-mini",
-      temperature: 0.3,
+      name: agent?.name ?? "",
+      description: agent?.description ?? "",
+      whatsappNumber: agent?.whatsappNumber ?? "",
+      model: agent?.model ?? process.env.NEXT_PUBLIC_DEFAULT_OPENAI_MODEL ?? "gpt-4o-mini",
+      temperature: agent?.temperature ?? 0.3,
       promptBase: "",
       initialMessage: "",
-      status: "DRAFT"
+      status: agent?.status ?? "DRAFT"
     }
   });
+
+  useEffect(() => {
+    reset({
+      name: agent?.name ?? "",
+      description: agent?.description ?? "",
+      whatsappNumber: agent?.whatsappNumber ?? "",
+      model: agent?.model ?? process.env.NEXT_PUBLIC_DEFAULT_OPENAI_MODEL ?? "gpt-4o-mini",
+      temperature: agent?.temperature ?? 0.3,
+      promptBase: "",
+      initialMessage: "",
+      status: agent?.status ?? "DRAFT"
+    });
+  }, [agent, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
 
-    const response = await fetch("/api/agents", {
-      method: "POST",
+    const response = await fetch(isEditing ? `/api/agents/${agent!.id}` : "/api/agents", {
+      method: isEditing ? "PUT" : "POST",
       headers: {
         "Content-Type": "application/json"
       },
@@ -56,11 +78,23 @@ export function AgentCreateDialog() {
 
     if (!response.ok) {
       const payload = (await response.json()) as { message?: string };
-      setServerError(payload.message ?? "Nao foi possivel criar o agente.");
+      setServerError(payload.message ?? `Nao foi possivel ${isEditing ? "atualizar" : "criar"} o agente.`);
       return;
     }
 
-    reset();
+    if (!isEditing) {
+      reset({
+        name: "",
+        description: "",
+        whatsappNumber: "",
+        model: process.env.NEXT_PUBLIC_DEFAULT_OPENAI_MODEL ?? "gpt-4o-mini",
+        temperature: 0.3,
+        promptBase: "",
+        initialMessage: "",
+        status: "DRAFT"
+      });
+    }
+
     setOpen(false);
     router.refresh();
   });
@@ -68,13 +102,15 @@ export function AgentCreateDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Novo agente</Button>
+        {trigger ?? <Button>{isEditing ? "Editar agente" : "Novo agente"}</Button>}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Criar agente IA</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar agente IA" : "Criar agente IA"}</DialogTitle>
           <DialogDescription>
-            Base inicial para agentes de recepcao, comercial, financeiro, cobranca e suporte, todos centralizados no backend.
+            {isEditing
+              ? "Atualize nome, numero, modelo, temperatura e comportamento do agente."
+              : "Base inicial para agentes de recepcao, comercial, financeiro, cobranca e suporte, todos centralizados no backend."}
           </DialogDescription>
         </DialogHeader>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
@@ -126,11 +162,25 @@ export function AgentCreateDialog() {
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Salvando..." : "Salvar agente"}
+              {isSubmitting ? "Salvando..." : isEditing ? "Salvar alteracoes" : "Salvar agente"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function AgentEditTrigger({ agent }: { agent: AgentListItem }) {
+  return (
+    <AgentCreateDialog
+      agent={agent}
+      trigger={
+        <Button variant="outline" className="w-full">
+          <PencilLine className="mr-2 size-4" />
+          Editar agente
+        </Button>
+      }
+    />
   );
 }

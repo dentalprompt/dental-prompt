@@ -2,6 +2,7 @@ import { Bot, Cpu, MessageSquareText, Phone } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { AgentEditTrigger } from "@/modules/agents/components/agent-create-dialog";
 import type { AgentListItem } from "@/modules/agents/types/agent";
 
 const statusMap: Record<AgentListItem["status"], { label: string; variant: "success" | "warning" | "info" }> = {
@@ -72,6 +73,8 @@ export function AgentList({ agents }: { agents: AgentListItem[] }) {
                 </p>
               </div>
             </div>
+
+            <AgentEditTrigger agent={agent} />
           </CardContent>
         </Card>
       ))}

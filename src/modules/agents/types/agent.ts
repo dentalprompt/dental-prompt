@@ -18,3 +18,5 @@ export type CreateAgentInput = {
   initialMessage?: string;
   status?: "ACTIVE" | "INACTIVE" | "DRAFT";
 };
+
+export type UpdateAgentInput = CreateAgentInput;

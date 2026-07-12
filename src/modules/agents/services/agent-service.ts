@@ -1,7 +1,7 @@
 import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockAgents } from "@/modules/agents/data/mock-agents";
-import type { AgentListItem, CreateAgentInput } from "@/modules/agents/types/agent";
+import type { AgentListItem, CreateAgentInput, UpdateAgentInput } from "@/modules/agents/types/agent";
 
 export async function listAgents(search?: string): Promise<AgentListItem[]> {
   if (!process.env.DATABASE_URL) {
@@ -82,6 +82,71 @@ export async function createAgent(input: CreateAgentInput): Promise<AgentListIte
       temperature: input.temperature,
       promptBase: input.promptBase,
       initialMessage: input.initialMessage,
+      status: input.status ?? "DRAFT"
+    }
+  });
+
+  return {
+    id: agent.id,
+    name: agent.name,
+    description: agent.description,
+    whatsappNumber: agent.whatsappNumber,
+    model: agent.model,
+    temperature: agent.temperature,
+    status: agent.status
+  };
+}
+
+export async function updateAgent(id: string, input: UpdateAgentInput): Promise<AgentListItem | null> {
+  if (!process.env.DATABASE_URL) {
+    const agent = mockAgents.find((item) => item.id === id);
+
+    if (!agent) {
+      return null;
+    }
+
+    return {
+      ...agent,
+      name: input.name,
+      description: input.description ?? null,
+      whatsappNumber: input.whatsappNumber,
+      model: input.model,
+      temperature: input.temperature,
+      status: input.status ?? "DRAFT"
+    };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const existingAgent = await prisma.agent.findUnique({
+    where: {
+      id
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!existingAgent || existingAgent.tenantId !== tenantId) {
+    return null;
+  }
+
+  const agent = await prisma.agent.update({
+    where: {
+      id
+    },
+    data: {
+      name: input.name,
+      description: input.description || null,
+      whatsappNumber: input.whatsappNumber,
+      model: input.model,
+      temperature: input.temperature,
+      promptBase: input.promptBase,
+      initialMessage: input.initialMessage || null,
       status: input.status ?? "DRAFT"
     }
   });

@@ -5,6 +5,7 @@ import type {
   ConversationDetail,
   ConversationListItem,
   ConversationMessage,
+  ConversationUpsertInput,
   SendMessageInput
 } from "@/modules/conversations/types/conversation";
 
@@ -193,4 +194,128 @@ export async function sendMessage(input: SendMessageInput): Promise<Conversation
     mediaUrl: message.mediaUrl,
     createdAt: message.createdAt.toISOString()
   };
+}
+
+export async function createConversation(input: ConversationUpsertInput) {
+  if (!process.env.DATABASE_URL) {
+    return {
+      id: `mock_conv_${Date.now()}`,
+      contactName: input.contactName,
+      contactPhone: input.contactPhone,
+      unreadCount: 0,
+      isAiEnabled: input.isAiEnabled ?? false,
+      patientId: input.patientId ?? null,
+      patientName: null,
+      lastMessagePreview: null,
+      lastMessageAt: null,
+      labels: []
+    };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const conversation = await prisma.conversation.create({
+    data: {
+      tenantId,
+      patientId: input.patientId || null,
+      contactName: input.contactName,
+      contactPhone: input.contactPhone,
+      isAiEnabled: input.isAiEnabled ?? false
+    },
+    include: {
+      patient: true
+    }
+  });
+
+  return {
+    id: conversation.id,
+    contactName: conversation.contactName,
+    contactPhone: conversation.contactPhone,
+    unreadCount: conversation.unreadCount,
+    isAiEnabled: conversation.isAiEnabled,
+    patientId: conversation.patientId,
+    patientName: conversation.patient?.fullName ?? null,
+    lastMessagePreview: null,
+    lastMessageAt: null,
+    labels: []
+  };
+}
+
+export async function updateConversation(id: string, input: ConversationUpsertInput) {
+  if (!process.env.DATABASE_URL) {
+    return { id };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const scoped = await prisma.conversation.findUnique({
+    where: { id },
+    select: { tenantId: true }
+  });
+
+  if (!scoped || scoped.tenantId !== tenantId) {
+    return null;
+  }
+
+  const conversation = await prisma.conversation.update({
+    where: { id },
+    data: {
+      patientId: input.patientId || null,
+      contactName: input.contactName,
+      contactPhone: input.contactPhone,
+      isAiEnabled: input.isAiEnabled ?? false
+    },
+    include: {
+      patient: true
+    }
+  });
+
+  return {
+    id: conversation.id,
+    contactName: conversation.contactName,
+    contactPhone: conversation.contactPhone,
+    unreadCount: conversation.unreadCount,
+    isAiEnabled: conversation.isAiEnabled,
+    patientId: conversation.patientId,
+    patientName: conversation.patient?.fullName ?? null,
+    lastMessagePreview: null,
+    lastMessageAt: conversation.lastMessageAt?.toISOString() ?? null,
+    labels: []
+  };
+}
+
+export async function toggleConversationAi(id: string) {
+  if (!process.env.DATABASE_URL) {
+    return { id };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const scoped = await prisma.conversation.findUnique({
+    where: { id },
+    select: { tenantId: true, isAiEnabled: true }
+  });
+
+  if (!scoped || scoped.tenantId !== tenantId) {
+    return null;
+  }
+
+  return prisma.conversation.update({
+    where: { id },
+    data: {
+      isAiEnabled: !scoped.isAiEnabled
+    }
+  });
 }

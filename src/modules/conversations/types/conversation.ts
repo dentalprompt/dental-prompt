@@ -46,3 +46,10 @@ export type SendMessageInput = {
   conversationId: string;
   content: string;
 };
+
+export type ConversationUpsertInput = {
+  contactName: string;
+  contactPhone: string;
+  patientId?: string;
+  isAiEnabled?: boolean;
+};

@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { SendHorizonal } from "lucide-react";
+import { Bot, SendHorizonal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,15 +11,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { ConversationDetail } from "@/modules/conversations/types/conversation";
+import { ConversationCreateDialog } from "@/modules/conversations/components/conversation-create-dialog";
+import type { PatientListItem } from "@/modules/patients/types/patient";
 
 function formatTime(value: string) {
   return format(new Date(value), "HH:mm", { locale: ptBR });
 }
 
-export function ConversationThread({ conversation }: { conversation: ConversationDetail | null }) {
+export function ConversationThread({
+  conversation,
+  patients
+}: {
+  conversation: ConversationDetail | null;
+  patients: PatientListItem[];
+}) {
   const router = useRouter();
   const [content, setContent] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isTogglingAi, setIsTogglingAi] = useState(false);
 
   async function handleSend() {
     if (!conversation || !content.trim()) {
@@ -44,6 +53,23 @@ export function ConversationThread({ conversation }: { conversation: Conversatio
     }
   }
 
+  async function handleToggleAi() {
+    if (!conversation) {
+      return;
+    }
+
+    setIsTogglingAi(true);
+
+    try {
+      await fetch(`/api/conversations/${conversation.id}`, {
+        method: "PATCH"
+      });
+      router.refresh();
+    } finally {
+      setIsTogglingAi(false);
+    }
+  }
+
   if (!conversation) {
     return (
       <Card className="min-h-[72vh] border-white/70 bg-white/88 backdrop-blur-md">
@@ -62,8 +88,19 @@ export function ConversationThread({ conversation }: { conversation: Conversatio
             <CardTitle>{conversation.contactName}</CardTitle>
             <CardDescription>{conversation.contactPhone}</CardDescription>
           </div>
-          <div className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white">
-            {conversation.messages.length} mensagem{conversation.messages.length === 1 ? "" : "ens"}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ConversationCreateDialog
+              conversation={conversation}
+              patients={patients}
+              trigger={<Button variant="outline">Editar conversa</Button>}
+            />
+            <Button variant="outline" onClick={handleToggleAi} disabled={isTogglingAi}>
+              <Bot className="mr-2 size-4" />
+              {isTogglingAi ? "Atualizando..." : conversation.isAiEnabled ? "Desativar IA" : "Ativar IA"}
+            </Button>
+            <div className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white">
+              {conversation.messages.length} mensagem{conversation.messages.length === 1 ? "" : "ens"}
+            </div>
           </div>
         </div>
       </CardHeader>

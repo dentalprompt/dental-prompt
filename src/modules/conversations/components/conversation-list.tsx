@@ -7,7 +7,9 @@ import { Bot, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ConversationCreateDialog } from "@/modules/conversations/components/conversation-create-dialog";
 import type { ConversationListItem } from "@/modules/conversations/types/conversation";
+import type { PatientListItem } from "@/modules/patients/types/patient";
 
 function formatTimestamp(value: string | null) {
   if (!value) {
@@ -19,10 +21,12 @@ function formatTimestamp(value: string | null) {
 
 export function ConversationList({
   conversations,
-  activeId
+  activeId,
+  patients
 }: {
   conversations: ConversationListItem[];
   activeId?: string;
+  patients: PatientListItem[];
 }) {
   return (
     <Card className="min-h-[72vh] overflow-hidden border-white/70 bg-white/88 backdrop-blur-md">
@@ -34,6 +38,10 @@ export function ConversationList({
               {conversations.length} ativa{conversations.length === 1 ? "" : "s"}
             </p>
           </div>
+          <ConversationCreateDialog
+            patients={patients}
+            trigger={<button className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-white">Nova</button>}
+          />
         </div>
 
         {conversations.length ? (

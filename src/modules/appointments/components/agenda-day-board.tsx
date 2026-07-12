@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarCheck2, Clock3, UserRound } from "lucide-react";
+import { CalendarCheck2, Clock3, Plus, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,11 @@ function formatHour(value: string) {
   return format(new Date(value), "HH:mm", { locale: ptBR });
 }
 
+function getMinutesFromIso(value: string) {
+  const date = new Date(value);
+  return date.getHours() * 60 + date.getMinutes();
+}
+
 export function AgendaDayBoard({
   appointments,
   date
@@ -29,21 +34,33 @@ export function AgendaDayBoard({
   appointments: AppointmentListItem[];
   date: string;
 }) {
-  const grouped = appointments.reduce<Record<string, AppointmentListItem[]>>((accumulator, appointment) => {
+  const grouped = appointments.reduce<
+    Record<string, { specialty: string; items: AppointmentListItem[] }>
+  >((accumulator, appointment) => {
     const professional = appointment.professional.name;
-    accumulator[professional] ??= [];
-    accumulator[professional].push(appointment);
+    accumulator[professional] ??= {
+      specialty: appointment.professional.specialty ?? "Sem especialidade definida",
+      items: []
+    };
+    accumulator[professional].items.push(appointment);
     return accumulator;
   }, {});
+
+  const professionals = Object.entries(grouped);
+  const startHour = 8;
+  const endHour = 20;
+  const slotHeight = 72;
+  const totalMinutes = (endHour - startHour) * 60;
+  const hourLabels = Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
 
   return (
     <div className="space-y-4">
       <Card className="border-white/70 bg-white/92">
         <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle>Agenda do dia</CardTitle>
+            <CardTitle>Agenda</CardTitle>
             <CardDescription>
-              Visualizacao operacional simplificada com base pronta para semana, mes e drag and drop.
+              Visualizacao em grade diaria, inspirada em calendario, com leitura rapida por horario e profissional.
             </CardDescription>
           </div>
           <div className="rounded-2xl border border-white/60 bg-white/55 px-4 py-3 text-sm font-medium text-slate-700 backdrop-blur-md">
@@ -68,43 +85,100 @@ export function AgendaDayBoard({
         </Card>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {Object.entries(grouped).map(([professional, items]) => (
-          <Card key={professional} className="border-white/70 bg-white/92">
-            <CardHeader>
-              <CardTitle>{professional}</CardTitle>
-              <CardDescription>{items[0]?.professional.specialty ?? "Sem especialidade definida"}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {items.map((appointment) => (
-                <div key={appointment.id} className="rounded-[1.25rem] border border-border bg-background p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Clock3 className="size-4 text-primary" />
-                        <span className="text-sm font-semibold text-slate-950">
-                          {formatHour(appointment.startsAt)} - {formatHour(appointment.endsAt)}
-                        </span>
-                      </div>
-                      <p className="text-base font-semibold text-slate-950">{appointment.title}</p>
-                      <p className="flex items-center gap-2 text-sm text-slate-500">
-                        <UserRound className="size-4" />
-                        {appointment.patient.fullName}
-                      </p>
-                      {appointment.notes ? (
-                        <p className="text-sm leading-6 text-slate-600">{appointment.notes}</p>
-                      ) : null}
-                    </div>
-                    <Badge variant={appointmentStatusMap[appointment.status].variant}>
-                      {appointmentStatusMap[appointment.status].label}
-                    </Badge>
-                  </div>
+      <Card className="overflow-hidden border-white/70 bg-white/92">
+        <CardContent className="p-0">
+          <div
+            className="grid min-w-[960px]"
+            style={{ gridTemplateColumns: `88px repeat(${Math.max(professionals.length, 1)}, minmax(240px, 1fr))` }}
+          >
+            <div className="border-r border-border/70 bg-white/35" />
+            {professionals.map(([professional, data]) => (
+              <div key={professional} className="border-r border-border/70 bg-white/35 p-4 last:border-r-0">
+                <p className="font-semibold text-slate-950">{professional}</p>
+                <p className="text-sm text-slate-500">{data.specialty}</p>
+              </div>
+            ))}
+
+            <div className="relative border-r border-border/70 bg-white/30">
+              {hourLabels.map((hour, index) => (
+                <div
+                  key={hour}
+                  className="relative border-t border-border/60 pr-3 text-right text-xs text-slate-400 first:border-t-0"
+                  style={{ height: index === hourLabels.length - 1 ? 0 : slotHeight }}
+                >
+                  <span className="-translate-y-3 inline-block bg-white/80 px-2 py-1">{`${String(hour).padStart(2, "0")}:00`}</span>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+
+            {professionals.map(([professional, data]) => (
+              <div key={professional} className="relative border-r border-border/70 last:border-r-0">
+                <div className="absolute inset-0">
+                  {Array.from({ length: endHour - startHour }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="border-t border-border/60"
+                      style={{ height: slotHeight }}
+                    />
+                  ))}
+                </div>
+
+                <div className="relative" style={{ height: `${(endHour - startHour) * slotHeight}px` }}>
+                  {data.items.map((appointment) => {
+                    const startMinutes = getMinutesFromIso(appointment.startsAt);
+                    const endMinutes = getMinutesFromIso(appointment.endsAt);
+                    const top = ((startMinutes - startHour * 60) / totalMinutes) * ((endHour - startHour) * slotHeight);
+                    const height = Math.max(
+                      ((endMinutes - startMinutes) / totalMinutes) * ((endHour - startHour) * slotHeight),
+                      88
+                    );
+
+                    return (
+                      <div
+                        key={appointment.id}
+                        className="absolute left-3 right-3 overflow-hidden rounded-[1.25rem] border border-primary/15 bg-white/92 p-4 shadow-sm backdrop-blur-sm"
+                        style={{ top: `${top}px`, height: `${height}px` }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Clock3 className="size-4 text-primary" />
+                              <span className="text-sm font-semibold text-slate-950">
+                                {formatHour(appointment.startsAt)} - {formatHour(appointment.endsAt)}
+                              </span>
+                            </div>
+                            <p className="text-base font-semibold text-slate-950">{appointment.title}</p>
+                            <p className="flex items-center gap-2 text-sm text-slate-500">
+                              <UserRound className="size-4" />
+                              {appointment.patient.fullName}
+                            </p>
+                            {appointment.notes ? (
+                              <p className="line-clamp-2 text-sm leading-6 text-slate-600">{appointment.notes}</p>
+                            ) : null}
+                          </div>
+                          <Badge variant={appointmentStatusMap[appointment.status].variant}>
+                            {appointmentStatusMap[appointment.status].label}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="absolute bottom-4 right-4">
+                    <button
+                      type="button"
+                      className="inline-flex size-11 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30"
+                      aria-label={`Novo agendamento para ${professional}`}
+                    >
+                      <Plus className="size-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

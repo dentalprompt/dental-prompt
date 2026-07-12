@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -93,7 +94,10 @@ export function AppointmentCreateDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Novo agendamento</Button>
+        <Button className="h-11 rounded-full px-5">
+          <Plus className="size-4" />
+          Novo agendamento
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

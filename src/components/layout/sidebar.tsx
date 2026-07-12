@@ -62,7 +62,11 @@ export function Sidebar({
       </Button>
 
       <div className="border-b border-white/60 pb-4">
-        <DentalPromptLogo className={cn("items-start", collapsed && "items-center")} compact={collapsed} />
+        <DentalPromptLogo
+          className={cn("items-start", collapsed && "items-center")}
+          compact={collapsed}
+          showTagline={false}
+        />
       </div>
       <nav className="mt-6 flex flex-1 flex-col gap-2">
         {items.map((item) => {

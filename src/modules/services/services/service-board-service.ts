@@ -6,6 +6,7 @@ import type {
   ServiceBoardView,
   ServiceCardView
 } from "@/modules/services/types/service";
+import type { UpdateServiceCardInput } from "@/modules/services/types/service";
 
 function formatDate(date: Date | null) {
   if (!date) {
@@ -261,4 +262,77 @@ export async function moveServiceCard(cardId: string, columnId: string) {
       columnId
     }
   });
+}
+
+export async function updateServiceCard(cardId: string, input: UpdateServiceCardInput) {
+  if (!process.env.DATABASE_URL) {
+    return { id: cardId };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const scopedCard = await prisma.serviceCard.findUnique({
+    where: {
+      id: cardId
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!scopedCard || scopedCard.tenantId !== tenantId) {
+    return null;
+  }
+
+  return prisma.serviceCard.update({
+    where: {
+      id: cardId
+    },
+    data: {
+      title: input.title,
+      description: input.description,
+      patientId: input.patientId || null,
+      professionalId: input.professionalId || null,
+      priority: input.priority,
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+      columnId: input.columnId
+    }
+  });
+}
+
+export async function deleteServiceCard(cardId: string) {
+  if (!process.env.DATABASE_URL) {
+    return { id: cardId };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const scopedCard = await prisma.serviceCard.findUnique({
+    where: {
+      id: cardId
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!scopedCard || scopedCard.tenantId !== tenantId) {
+    return null;
+  }
+
+  await prisma.serviceCard.delete({
+    where: {
+      id: cardId
+    }
+  });
+
+  return { id: cardId };
 }

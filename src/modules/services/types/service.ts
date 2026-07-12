@@ -37,6 +37,8 @@ export type CreateServiceCardInput = {
   columnId: string;
 };
 
+export type UpdateServiceCardInput = CreateServiceCardInput;
+
 export type ServiceBoardFilters = {
   search?: string;
   patientId?: string;

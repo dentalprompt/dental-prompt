@@ -1,8 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { PencilLine } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -19,22 +20,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createServiceCardSchema, type CreateServiceCardFormValues } from "@/modules/services/schemas/service-schema";
-import type { ServiceBoardView } from "@/modules/services/types/service";
+import type { ServiceBoardView, ServiceCardView } from "@/modules/services/types/service";
 import type { PatientListItem } from "@/modules/patients/types/patient";
 import type { ProfessionalListItem } from "@/modules/team/types/professional";
+
+type Props = {
+  board: ServiceBoardView;
+  patients: PatientListItem[];
+  professionals: ProfessionalListItem[];
+  card?: ServiceCardView;
+  initialColumnId?: string;
+  trigger?: ReactNode;
+};
 
 export function ServiceCreateDialog({
   board,
   patients,
-  professionals
-}: {
-  board: ServiceBoardView;
-  patients: PatientListItem[];
-  professionals: ProfessionalListItem[];
-}) {
+  professionals,
+  card,
+  initialColumnId,
+  trigger
+}: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const isEditing = Boolean(card);
+
+  const currentColumnId = useMemo(
+    () =>
+      initialColumnId ??
+      board.columns.find((column) => column.cards.some((item) => item.id === card?.id))?.id ??
+      board.columns[0]?.id ??
+      "",
+    [board, card?.id, initialColumnId]
+  );
+
   const {
     register,
     handleSubmit,
@@ -43,21 +63,33 @@ export function ServiceCreateDialog({
   } = useForm<CreateServiceCardFormValues>({
     resolver: zodResolver(createServiceCardSchema),
     defaultValues: {
-      title: "",
-      description: "",
-      patientId: "",
-      professionalId: "",
-      priority: "NORMAL",
-      dueDate: "",
-      columnId: board.columns[0]?.id ?? ""
+      title: card?.title ?? "",
+      description: card?.description ?? "",
+      patientId: card?.patientId ?? "",
+      professionalId: card?.professionalId ?? "",
+      priority: card?.priority ?? "NORMAL",
+      dueDate: card?.dueDate ? card.dueDate.slice(0, 10) : "",
+      columnId: currentColumnId
     }
   });
+
+  useEffect(() => {
+    reset({
+      title: card?.title ?? "",
+      description: card?.description ?? "",
+      patientId: card?.patientId ?? "",
+      professionalId: card?.professionalId ?? "",
+      priority: card?.priority ?? "NORMAL",
+      dueDate: card?.dueDate ? card.dueDate.slice(0, 10) : "",
+      columnId: currentColumnId
+    });
+  }, [card, currentColumnId, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
 
-    const response = await fetch("/api/services/cards", {
-      method: "POST",
+    const response = await fetch(isEditing ? `/api/services/cards/${card!.id}` : "/api/services/cards", {
+      method: isEditing ? "PUT" : "POST",
       headers: {
         "Content-Type": "application/json"
       },
@@ -71,25 +103,36 @@ export function ServiceCreateDialog({
 
     if (!response.ok) {
       const payload = (await response.json()) as { message?: string };
-      setServerError(payload.message ?? "Nao foi possivel criar o servico.");
+      setServerError(payload.message ?? `Nao foi possivel ${isEditing ? "atualizar" : "criar"} o servico.`);
       return;
     }
 
-    reset();
+    if (!isEditing) {
+      reset({
+        title: "",
+        description: "",
+        patientId: "",
+        professionalId: "",
+        priority: "NORMAL",
+        dueDate: "",
+        columnId: currentColumnId
+      });
+    }
+
     setOpen(false);
     router.refresh();
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>Adicionar servico</Button>
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger ?? <Button>Adicionar servico</Button>}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Novo servico</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar servico" : "Novo servico"}</DialogTitle>
           <DialogDescription>
-            Cadastro inicial do fluxo operacional preparado para evoluir com Kanbans personalizaveis e historico.
+            {isEditing
+              ? "Atualize paciente, profissional, prioridade, etapa e prazo do cartao."
+              : "Cadastro operacional do fluxo de servicos com manutencao pronta para o Kanban da clinica."}
           </DialogDescription>
         </DialogHeader>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
@@ -138,7 +181,7 @@ export function ServiceCreateDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="columnId">Kanban inicial</Label>
+            <Label htmlFor="columnId">Kanban</Label>
             <select
               id="columnId"
               className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
@@ -177,11 +220,38 @@ export function ServiceCreateDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Salvando..." : "Salvar servico"}
+              {isSubmitting ? "Salvando..." : isEditing ? "Salvar alteracoes" : "Salvar servico"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function ServiceEditTrigger({
+  board,
+  patients,
+  professionals,
+  card
+}: {
+  board: ServiceBoardView;
+  patients: PatientListItem[];
+  professionals: ProfessionalListItem[];
+  card: ServiceCardView;
+}) {
+  return (
+    <ServiceCreateDialog
+      board={board}
+      patients={patients}
+      professionals={professionals}
+      card={card}
+      trigger={
+        <Button variant="outline" size="sm">
+          <PencilLine className="mr-2 size-4" />
+          Editar
+        </Button>
+      }
+    />
   );
 }

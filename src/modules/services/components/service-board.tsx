@@ -1,13 +1,16 @@
 "use client";
 
-import { CalendarClock, MoveRight, UserRound } from "lucide-react";
+import { CalendarClock, MoveRight, Trash2, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ServiceEditTrigger } from "@/modules/services/components/service-create-dialog";
 import type { ServiceBoardView, ServicePriority } from "@/modules/services/types/service";
+import type { PatientListItem } from "@/modules/patients/types/patient";
+import type { ProfessionalListItem } from "@/modules/team/types/professional";
 
 const priorityLabel: Record<ServicePriority, string> = {
   LOW: "Baixa",
@@ -35,9 +38,18 @@ function formatDate(date: string | null) {
   }).format(new Date(date));
 }
 
-export function ServiceBoard({ board }: { board: ServiceBoardView }) {
+export function ServiceBoard({
+  board,
+  patients,
+  professionals
+}: {
+  board: ServiceBoardView;
+  patients: PatientListItem[];
+  professionals: ProfessionalListItem[];
+}) {
   const router = useRouter();
   const [movingCardId, setMovingCardId] = useState<string | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
 
   const moveCard = async (cardId: string, columnId: string) => {
     setMovingCardId(cardId);
@@ -51,6 +63,22 @@ export function ServiceBoard({ board }: { board: ServiceBoardView }) {
     });
 
     setMovingCardId(null);
+
+    if (!response.ok) {
+      return;
+    }
+
+    router.refresh();
+  };
+
+  const deleteCard = async (cardId: string) => {
+    setDeletingCardId(cardId);
+
+    const response = await fetch(`/api/services/cards/${cardId}`, {
+      method: "DELETE"
+    });
+
+    setDeletingCardId(null);
 
     if (!response.ok) {
       return;
@@ -101,16 +129,33 @@ export function ServiceBoard({ board }: { board: ServiceBoardView }) {
                     </div>
                   </div>
 
-                  {columnIndex < board.columns.length - 1 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ServiceEditTrigger
+                      board={board}
+                      patients={patients}
+                      professionals={professionals}
+                      card={card}
+                    />
+                    {columnIndex < board.columns.length - 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => moveCard(card.id, board.columns[columnIndex + 1].id)}
+                        disabled={movingCardId === card.id}
+                        className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-semibold text-primary transition hover:bg-white disabled:opacity-50"
+                      >
+                        {movingCardId === card.id ? "Movendo..." : `Mover para ${board.columns[columnIndex + 1].name}`}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={() => moveCard(card.id, board.columns[columnIndex + 1].id)}
-                      disabled={movingCardId === card.id}
-                      className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary/80 disabled:opacity-50"
+                      onClick={() => deleteCard(card.id)}
+                      disabled={deletingCardId === card.id}
+                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                     >
-                      {movingCardId === card.id ? "Movendo..." : `Mover para ${board.columns[columnIndex + 1].name}`}
+                      <Trash2 className="size-4" />
+                      {deletingCardId === card.id ? "Excluindo..." : "Excluir"}
                     </button>
-                  ) : null}
+                  </div>
                 </div>
               ))
             ) : (

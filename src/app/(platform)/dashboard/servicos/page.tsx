@@ -66,7 +66,7 @@ export default async function ServicesPage({
         </CardContent>
       </Card>
 
-      <ServiceBoard board={board} />
+      <ServiceBoard board={board} patients={patients} professionals={professionals} />
     </div>
   );
 }

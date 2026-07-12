@@ -5,6 +5,7 @@ import type {
   CreatePlanInput,
   PlanDetail,
   PlanListItem,
+  UpdatePlanInput,
   UpdateProcedureInput
 } from "@/modules/plans/types/plan";
 
@@ -214,5 +215,77 @@ export async function updatePlanProcedure(
     isActive: procedure.isActive,
     usesToothFaces: procedure.usesToothFaces,
     notes: procedure.notes
+  };
+}
+
+export async function updatePlan(id: string, input: UpdatePlanInput): Promise<PlanListItem | null> {
+  if (!process.env.DATABASE_URL) {
+    const detail = mockPlanDetails[id];
+
+    if (!detail) {
+      return null;
+    }
+
+    return mapPlanListFromDetail({
+      ...detail,
+      name: input.name,
+      description: input.description ?? null,
+      isDefault: input.isDefault ?? false,
+      isInsurance: input.isInsurance ?? false
+    });
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const existingPlan = await prisma.plan.findUnique({
+    where: { id },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!existingPlan || existingPlan.tenantId !== tenantId) {
+    return null;
+  }
+
+  if (input.isDefault) {
+    await prisma.plan.updateMany({
+      where: {
+        tenantId,
+        id: {
+          not: id
+        }
+      },
+      data: {
+        isDefault: false
+      }
+    });
+  }
+
+  const plan = await prisma.plan.update({
+    where: { id },
+    data: {
+      name: input.name,
+      description: input.description || null,
+      isDefault: input.isDefault ?? false,
+      isInsurance: input.isInsurance ?? false
+    },
+    include: {
+      procedures: true
+    }
+  });
+
+  return {
+    id: plan.id,
+    name: plan.name,
+    description: plan.description,
+    isDefault: plan.isDefault,
+    isInsurance: plan.isInsurance,
+    isActive: plan.isActive,
+    proceduresCount: plan.procedures.length
   };
 }

@@ -5,6 +5,7 @@ import { ArrowRight, ShieldCheck, Stethoscope, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PlanEditTrigger } from "@/modules/plans/components/plan-create-dialog";
 import type { PlanListItem } from "@/modules/plans/types/plan";
 
 export function PlanList({ plans }: { plans: PlanListItem[] }) {
@@ -68,12 +69,15 @@ export function PlanList({ plans }: { plans: PlanListItem[] }) {
               </div>
             </div>
 
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`/dashboard/planos/${plan.id}` as Route}>
-                Abrir configuracao completa
-                <ArrowRight className="ml-2 size-4" />
-              </Link>
-            </Button>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <PlanEditTrigger plan={plan} />
+              <Button asChild variant="outline" className="w-full">
+                <Link href={`/dashboard/planos/${plan.id}` as Route}>
+                  Abrir configuracao completa
+                  <ArrowRight className="ml-2 size-4" />
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ))}

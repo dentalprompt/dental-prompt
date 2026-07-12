@@ -15,6 +15,8 @@ export type CreatePlanInput = {
   isInsurance?: boolean;
 };
 
+export type UpdatePlanInput = CreatePlanInput;
+
 export type PlanProcedureItem = {
   id: string;
   specialty: string;

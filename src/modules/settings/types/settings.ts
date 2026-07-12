@@ -9,3 +9,41 @@ export type ClinicSettingsView = {
   primaryColor: string;
   secondaryColor: string;
 };
+
+export type AnamnesisTemplateItem = {
+  id: string;
+  name: string;
+  description: string;
+  specialty: string;
+  isActive: boolean;
+};
+
+export type ContractTemplateItem = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  content: string;
+  isActive: boolean;
+};
+
+export type FinancialAccountItem = {
+  id: string;
+  name: string;
+  bank: string;
+  agency: string;
+  account: string;
+  type: string;
+  initialBalance: number;
+  isActive: boolean;
+};
+
+export type ChairItem = {
+  id: string;
+  name: string;
+  code: string;
+  room: string;
+  color: string;
+  notes: string;
+  isActive: boolean;
+};

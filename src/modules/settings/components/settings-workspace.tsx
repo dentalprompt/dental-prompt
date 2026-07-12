@@ -1,9 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Activity, FileText, Palette, Rows3, ShieldCheck, Wallet } from "lucide-react";
+import { Activity, FileText, Palette, Plus, Rows3, ShieldCheck, Trash2, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,32 +19,175 @@ import {
 } from "@/modules/settings/schemas/clinic-settings-schema";
 import type { ClinicSettingsView } from "@/modules/settings/types/settings";
 
-const settingsRoadmap = [
-  {
-    value: "anamnese",
-    title: "Anamnese",
-    description: "Modelos dinamicos por especialidade, campos customizados e ativacao por status.",
-    icon: Rows3
-  },
-  {
-    value: "contratos",
-    title: "Contratos",
-    description: "Modelos com variaveis, exportacao PDF e futura assinatura digital.",
-    icon: FileText
-  },
-  {
-    value: "contas",
-    title: "Contas financeiras",
-    description: "Cadastro das contas que abastecem o modulo financeiro e o fluxo de caixa.",
-    icon: Wallet
-  },
-  {
-    value: "cadeiras",
-    title: "Cadeiras",
-    description: "Estrutura pronta para reserva futura por agenda, profissional e sala.",
-    icon: Activity
+type CollectionField = {
+  key: string;
+  label: string;
+  placeholder: string;
+  type?: "text" | "number" | "textarea";
+};
+
+function SettingsCollectionSection({
+  title,
+  description,
+  endpoint,
+  fields,
+  emptyMessage,
+  icon: Icon,
+  renderSummary
+}: {
+  title: string;
+  description: string;
+  endpoint: string;
+  fields: CollectionField[];
+  emptyMessage: string;
+  icon: typeof Rows3;
+  renderSummary: (item: Record<string, unknown>) => React.ReactNode;
+}) {
+  const [items, setItems] = useState<Record<string, unknown>[]>([]);
+  const [formValues, setFormValues] = useState<Record<string, string>>(
+    Object.fromEntries(fields.map((field) => [field.key, ""]))
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const loadItems = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(endpoint, { cache: "no-store" });
+      const payload = (await response.json()) as { data?: Record<string, unknown>[] };
+      setItems(payload.data ?? []);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [endpoint]);
+
+  useEffect(() => {
+    void loadItems();
+  }, [loadItems]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formValues)
+      });
+
+      setFormValues(Object.fromEntries(fields.map((field) => [field.key, ""])));
+      await loadItems();
+    } finally {
+      setIsSubmitting(false);
+    }
   }
-] as const;
+
+  async function handleToggle(id: string) {
+    await fetch(`${endpoint}/${id}`, { method: "PATCH" });
+    await loadItems();
+  }
+
+  async function handleDelete(id: string) {
+    await fetch(`${endpoint}/${id}`, { method: "DELETE" });
+    await loadItems();
+  }
+
+  return (
+    <Card className="border-white/70 bg-white/92">
+      <CardHeader className="space-y-2">
+        <Badge>{title}</Badge>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <form className="space-y-4 rounded-[1.5rem] border border-border bg-background p-5" onSubmit={handleSubmit}>
+          <div className="flex items-center gap-3">
+            <span className="rounded-2xl bg-accent p-3 text-primary">
+              <Icon className="size-5" />
+            </span>
+            <div>
+              <p className="font-semibold text-slate-950">Novo registro</p>
+              <p className="text-sm text-slate-500">Cadastre um novo item desta sub aba.</p>
+            </div>
+          </div>
+
+          {fields.map((field) => (
+            <div key={field.key} className="space-y-2">
+              <Label htmlFor={`${endpoint}-${field.key}`}>{field.label}</Label>
+              {field.type === "textarea" ? (
+                <Textarea
+                  id={`${endpoint}-${field.key}`}
+                  placeholder={field.placeholder}
+                  value={formValues[field.key] ?? ""}
+                  onChange={(event) =>
+                    setFormValues((current) => ({
+                      ...current,
+                      [field.key]: event.target.value
+                    }))
+                  }
+                />
+              ) : (
+                <Input
+                  id={`${endpoint}-${field.key}`}
+                  type={field.type === "number" ? "number" : "text"}
+                  placeholder={field.placeholder}
+                  value={formValues[field.key] ?? ""}
+                  onChange={(event) =>
+                    setFormValues((current) => ({
+                      ...current,
+                      [field.key]: event.target.value
+                    }))
+                  }
+                />
+              )}
+            </div>
+          ))}
+
+          <Button type="submit" disabled={isSubmitting}>
+            <Plus className="size-4" />
+            {isSubmitting ? "Salvando..." : `Adicionar ${title}`}
+          </Button>
+        </form>
+
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="rounded-[1.25rem] border border-dashed border-border bg-background p-4 text-sm text-slate-500">
+              Carregando dados...
+            </div>
+          ) : items.length ? (
+            items.map((item) => (
+              <div key={String(item.id)} className="rounded-[1.25rem] border border-border bg-background p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    {renderSummary(item)}
+                    <Badge variant={item.isActive ? "success" : "default"}>
+                      {item.isActive ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" onClick={() => handleToggle(String(item.id))}>
+                      {item.isActive ? "Desativar" : "Ativar"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => handleDelete(String(item.id))}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-[1.25rem] border border-dashed border-border bg-background p-4 text-sm text-slate-500">
+              {emptyMessage}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function SettingsWorkspace({ initialSettings }: { initialSettings: ClinicSettingsView }) {
   const router = useRouter();
@@ -253,60 +396,103 @@ export function SettingsWorkspace({ initialSettings }: { initialSettings: Clinic
           </div>
         </TabsContent>
 
-        {settingsRoadmap.map((section) => {
-          const Icon = section.icon;
-          const tabValue =
-            section.value === "contas"
-              ? "contas"
-              : section.value === "cadeiras"
-                ? "cadeiras"
-                : section.value === "contratos"
-                  ? "contratos"
-                  : "anamnese";
+        <TabsContent value="anamnese">
+          <SettingsCollectionSection
+            title="Anamnese"
+            description="Modelos dinamicos por especialidade, campos customizados e ativacao por status."
+            endpoint="/api/settings/anamneses"
+            icon={Rows3}
+            emptyMessage="Nenhum modelo de anamnese cadastrado."
+            fields={[
+              { key: "name", label: "Nome", placeholder: "Ex.: Anamnese ortodontia" },
+              { key: "description", label: "Descricao", placeholder: "Resumo do modelo", type: "textarea" },
+              { key: "specialty", label: "Especialidade", placeholder: "Ex.: Ortodontia" }
+            ]}
+            renderSummary={(item) => (
+              <>
+                <p className="font-semibold text-slate-950">{String(item.name ?? "")}</p>
+                <p className="text-sm text-slate-500">{String(item.specialty ?? "") || "Sem especialidade"}</p>
+                <p className="text-sm text-slate-600">{String(item.description ?? "") || "Sem descricao"}</p>
+              </>
+            )}
+          />
+        </TabsContent>
 
-          return (
-            <TabsContent key={section.value} value={tabValue}>
-              <Card className="border-white/70 bg-white/92">
-                <CardHeader className="space-y-2">
-                  <Badge>{section.title}</Badge>
-                  <CardTitle>{section.title}</CardTitle>
-                  <CardDescription>{section.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                  <div className="rounded-[1.5rem] border border-white/60 bg-gradient-to-br from-white/55 via-cyan-50/70 to-white/45 p-6 text-slate-950 backdrop-blur-md">
-                    <div className="flex items-center gap-3">
-                      <span className="rounded-2xl bg-white/70 p-3 text-primary shadow-sm">
-                        <Icon className="size-5" />
-                      </span>
-                      <div>
-                        <p className="text-sm text-slate-500">Estrutura preparada</p>
-                        <p className="text-xl font-semibold">{section.title}</p>
-                      </div>
-                    </div>
-                    <p className="mt-4 text-sm leading-6 text-slate-600">
-                      Esta sub aba ja tem espaco reservado no CRM e sera a proxima camada de profundidade deste modulo.
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {[
-                      "Carregamento isolado por sub aba",
-                      "Escopo restrito ao tenant autenticado",
-                      "Arquitetura pronta para auditoria",
-                      "Base preparada para filtros e CRUD"
-                    ].map((item) => (
-                      <div key={item} className="rounded-[1.25rem] border border-border bg-background p-4">
-                        <p className="font-medium text-slate-950">{item}</p>
-                        <p className="mt-2 text-sm text-slate-500">
-                          Evolucao pensada para encaixar no restante do CRM sem retrabalho estrutural.
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          );
-        })}
+        <TabsContent value="contratos">
+          <SettingsCollectionSection
+            title="Contratos"
+            description="Modelos com variaveis, exportacao PDF e futura assinatura digital."
+            endpoint="/api/settings/contracts"
+            icon={FileText}
+            emptyMessage="Nenhum contrato cadastrado."
+            fields={[
+              { key: "name", label: "Nome", placeholder: "Ex.: Contrato tratamento padrao" },
+              { key: "description", label: "Descricao", placeholder: "Resumo do modelo", type: "textarea" },
+              { key: "category", label: "Categoria", placeholder: "Ex.: Consentimento" },
+              { key: "content", label: "Conteudo", placeholder: "Texto base do contrato", type: "textarea" }
+            ]}
+            renderSummary={(item) => (
+              <>
+                <p className="font-semibold text-slate-950">{String(item.name ?? "")}</p>
+                <p className="text-sm text-slate-500">{String(item.category ?? "") || "Sem categoria"}</p>
+                <p className="text-sm text-slate-600">{String(item.description ?? "") || "Sem descricao"}</p>
+              </>
+            )}
+          />
+        </TabsContent>
+
+        <TabsContent value="contas">
+          <SettingsCollectionSection
+            title="Contas financeiras"
+            description="Cadastro das contas que abastecem o modulo financeiro e o fluxo de caixa."
+            endpoint="/api/settings/accounts"
+            icon={Wallet}
+            emptyMessage="Nenhuma conta financeira cadastrada."
+            fields={[
+              { key: "name", label: "Nome", placeholder: "Ex.: Conta Caixa" },
+              { key: "bank", label: "Banco", placeholder: "Ex.: Banco do Brasil" },
+              { key: "agency", label: "Agencia", placeholder: "Ex.: 1234-5" },
+              { key: "account", label: "Conta", placeholder: "Ex.: 98765-4" },
+              { key: "type", label: "Tipo", placeholder: "Ex.: Caixa, Banco, PIX" },
+              { key: "initialBalance", label: "Saldo inicial", placeholder: "0", type: "number" }
+            ]}
+            renderSummary={(item) => (
+              <>
+                <p className="font-semibold text-slate-950">{String(item.name ?? "")}</p>
+                <p className="text-sm text-slate-500">
+                  {String(item.bank ?? "") || "Sem banco"} • {String(item.type ?? "") || "Sem tipo"}
+                </p>
+                <p className="text-sm text-slate-600">Saldo inicial: R$ {Number(item.initialBalance ?? 0).toFixed(2)}</p>
+              </>
+            )}
+          />
+        </TabsContent>
+
+        <TabsContent value="cadeiras">
+          <SettingsCollectionSection
+            title="Cadeiras"
+            description="Reserva operacional das cadeiras odontologicas por sala, codigo e status."
+            endpoint="/api/settings/chairs"
+            icon={Activity}
+            emptyMessage="Nenhuma cadeira cadastrada."
+            fields={[
+              { key: "name", label: "Nome", placeholder: "Ex.: Cadeira 01" },
+              { key: "code", label: "Codigo", placeholder: "Ex.: CAD-01" },
+              { key: "room", label: "Sala", placeholder: "Ex.: Sala A" },
+              { key: "color", label: "Cor", placeholder: "Ex.: #22C7C7" },
+              { key: "notes", label: "Observacoes", placeholder: "Detalhes da cadeira", type: "textarea" }
+            ]}
+            renderSummary={(item) => (
+              <>
+                <p className="font-semibold text-slate-950">{String(item.name ?? "")}</p>
+                <p className="text-sm text-slate-500">
+                  {String(item.code ?? "") || "Sem codigo"} • {String(item.room ?? "") || "Sem sala"}
+                </p>
+                <p className="text-sm text-slate-600">{String(item.notes ?? "") || "Sem observacoes"}</p>
+              </>
+            )}
+          />
+        </TabsContent>
       </Tabs>
 
       <Card className="border-white/70 bg-white/92">

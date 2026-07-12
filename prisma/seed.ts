@@ -363,6 +363,131 @@ async function main() {
     }
   });
 
+  await Promise.all(
+    [
+      {
+        id: "anamnesis_demo_1",
+        name: "Anamnese clinica geral",
+        description: "Modelo base para primeira consulta e triagem.",
+        specialty: "Clinica geral",
+        isActive: true
+      },
+      {
+        id: "anamnesis_demo_2",
+        name: "Anamnese ortodontia",
+        description: "Checklist inicial para ortodontia.",
+        specialty: "Ortodontia",
+        isActive: true
+      }
+    ].map((item) =>
+      prisma.anamnesisTemplate.upsert({
+        where: { id: item.id },
+        update: {},
+        create: {
+          ...item,
+          tenantId: tenant.id
+        }
+      })
+    )
+  );
+
+  await Promise.all(
+    [
+      {
+        id: "contract_demo_1",
+        name: "Contrato tratamento padrao",
+        description: "Modelo principal para tratamentos recorrentes.",
+        category: "Tratamento",
+        content: "Contrato padrao com clausulas de atendimento, pagamento e acompanhamento.",
+        isActive: true
+      },
+      {
+        id: "contract_demo_2",
+        name: "Consentimento implantodontia",
+        description: "Documento de aceite para procedimento implantodontico.",
+        category: "Consentimento",
+        content: "Modelo de consentimento informado para implantodontia.",
+        isActive: true
+      }
+    ].map((item) =>
+      prisma.contractTemplate.upsert({
+        where: { id: item.id },
+        update: {},
+        create: {
+          ...item,
+          tenantId: tenant.id
+        }
+      })
+    )
+  );
+
+  await Promise.all(
+    [
+      {
+        id: "account_demo_1",
+        name: "Conta Caixa",
+        bank: "Interno",
+        agency: "",
+        account: "",
+        type: "Caixa",
+        initialBalance: 1500,
+        isActive: true
+      },
+      {
+        id: "account_demo_2",
+        name: "Banco principal",
+        bank: "Banco do Brasil",
+        agency: "1234-5",
+        account: "98765-4",
+        type: "Banco",
+        initialBalance: 8500,
+        isActive: true
+      }
+    ].map((item) =>
+      prisma.financialAccount.upsert({
+        where: { id: item.id },
+        update: {},
+        create: {
+          ...item,
+          initialBalance: item.initialBalance,
+          tenantId: tenant.id
+        }
+      })
+    )
+  );
+
+  await Promise.all(
+    [
+      {
+        id: "chair_demo_1",
+        name: "Cadeira 01",
+        code: "CAD-01",
+        room: "Sala A",
+        color: "#0A3F9A",
+        isActive: true,
+        notes: "Uso geral"
+      },
+      {
+        id: "chair_demo_2",
+        name: "Cadeira 02",
+        code: "CAD-02",
+        room: "Sala B",
+        color: "#22C7C7",
+        isActive: true,
+        notes: "Prioridade ortodontia"
+      }
+    ].map((item) =>
+      prisma.chair.upsert({
+        where: { id: item.id },
+        update: {},
+        create: {
+          ...item,
+          tenantId: tenant.id
+        }
+      })
+    )
+  );
+
   await prisma.agent.upsert({
     where: { id: "agent_demo_2" },
     update: {},

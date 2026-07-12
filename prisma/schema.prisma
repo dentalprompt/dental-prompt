@@ -117,6 +117,10 @@ model Tenant {
   serviceBoards  ServiceBoard[]
   agents         Agent[]
   settings       ClinicSettings?
+  anamneses      AnamnesisTemplate[]
+  contracts      ContractTemplate[]
+  accounts       FinancialAccount[]
+  chairs         Chair[]
   auditLogs      AuditLog[]
 }
 
@@ -426,4 +430,66 @@ model ClinicSettings {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model AnamnesisTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  specialty   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, name])
+}
+
+model ContractTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  category    String?
+  content     String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, name])
+}
+
+model FinancialAccount {
+  id             String   @id @default(cuid())
+  tenantId       String
+  name           String
+  bank           String?
+  agency         String?
+  account        String?
+  type           String
+  initialBalance Decimal  @default(0) @db.Decimal(10, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, name])
+}
+
+model Chair {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  code        String?
+  room        String?
+  color       String?
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, name])
 }

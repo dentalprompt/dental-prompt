@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { getRequestSession } from "@/lib/auth/request-session";
 import { sendMessage } from "@/modules/conversations/services/conversation-service";
 
 const sendMessageSchema = z.object({
@@ -12,6 +13,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = getRequestSession(request);
+
+    if (!session) {
+      return NextResponse.json({ message: "Sessao invalida." }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const values = sendMessageSchema.parse(body);

@@ -1,6 +1,11 @@
 import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
-import type { CreateServiceCardInput, ServiceBoardView, ServiceCardView } from "@/modules/services/types/service";
+import type {
+  CreateServiceCardInput,
+  ServiceBoardFilters,
+  ServiceBoardView,
+  ServiceCardView
+} from "@/modules/services/types/service";
 
 function formatDate(date: Date | null) {
   if (!date) {
@@ -10,58 +15,88 @@ function formatDate(date: Date | null) {
   return date.toISOString();
 }
 
-function buildMockBoard(): ServiceBoardView {
+function matchesSearch(values: Array<string | null | undefined>, search?: string) {
+  if (!search) {
+    return true;
+  }
+
+  const normalized = search.trim().toLowerCase();
+  return values.some((value) => value?.toLowerCase().includes(normalized));
+}
+
+function filterBoard(board: ServiceBoardView, filters: ServiceBoardFilters) {
   return {
-    id: "mock-service-board",
-    name: "Fluxo principal",
-    description: "Kanban operacional da clinica.",
-    columns: [
-      {
-        id: "mock-column-1",
-        name: "Novo servico",
-        color: "#0A3F9A",
-        position: 1,
-        cards: [
-          {
-            id: "mock-card-1",
-            title: "Clareamento supervisionado",
-            description: "Paciente aguardando inicio da sequencia clinica.",
-            patientId: "patient_demo_1",
-            patientName: "Mariana Carvalho de Lima",
-            professionalId: "pro_demo_1",
-            professionalName: "Dra. Camila Borges",
-            priority: "NORMAL",
-            dueDate: new Date().toISOString()
-          }
-        ]
-      },
-      {
-        id: "mock-column-2",
-        name: "Em producao",
-        color: "#22C7C7",
-        position: 2,
-        cards: []
-      },
-      {
-        id: "mock-column-3",
-        name: "Concluido",
-        color: "#16A34A",
-        position: 3,
-        cards: []
-      }
-    ]
+    ...board,
+    columns: board.columns
+      .filter((column) => !filters.columnId || column.id === filters.columnId)
+      .map((column) => ({
+        ...column,
+        cards: column.cards.filter((card) => {
+          if (filters.patientId && card.patientId !== filters.patientId) return false;
+          if (filters.professionalId && card.professionalId !== filters.professionalId) return false;
+          if (filters.priority && card.priority !== filters.priority) return false;
+
+          return matchesSearch([card.title, card.description, card.patientName, card.professionalName], filters.search);
+        })
+      }))
   };
 }
 
-export async function getPrimaryServiceBoard(): Promise<ServiceBoardView> {
+function buildMockBoard(filters: ServiceBoardFilters = {}): ServiceBoardView {
+  return filterBoard(
+    {
+      id: "mock-service-board",
+      name: "Fluxo principal",
+      description: "Kanban operacional da clinica.",
+      columns: [
+        {
+          id: "mock-column-1",
+          name: "Novo servico",
+          color: "#0A3F9A",
+          position: 1,
+          cards: [
+            {
+              id: "mock-card-1",
+              title: "Clareamento supervisionado",
+              description: "Paciente aguardando inicio da sequencia clinica.",
+              patientId: "patient_demo_1",
+              patientName: "Mariana Carvalho de Lima",
+              professionalId: "pro_demo_1",
+              professionalName: "Dra. Camila Borges",
+              priority: "NORMAL",
+              dueDate: new Date().toISOString()
+            }
+          ]
+        },
+        {
+          id: "mock-column-2",
+          name: "Em producao",
+          color: "#22C7C7",
+          position: 2,
+          cards: []
+        },
+        {
+          id: "mock-column-3",
+          name: "Concluido",
+          color: "#16A34A",
+          position: 3,
+          cards: []
+        }
+      ]
+    },
+    filters
+  );
+}
+
+export async function getPrimaryServiceBoard(filters: ServiceBoardFilters = {}): Promise<ServiceBoardView> {
   if (!process.env.DATABASE_URL) {
-    return buildMockBoard();
+    return buildMockBoard(filters);
   }
 
   const tenantId = await resolveTenantId();
 
   if (!tenantId) {
-    return buildMockBoard();
+    return buildMockBoard(filters);
   }
 
   const board = await prisma.serviceBoard.findFirst({
@@ -88,7 +123,7 @@ export async function getPrimaryServiceBoard(): Promise<ServiceBoardView> {
   });
 
   if (!board) {
-    return buildMockBoard();
+    return buildMockBoard(filters);
   }
 
   const patientIds = board.columns.flatMap((column) => column.cards.map((card) => card.patientId).filter(Boolean)) as string[];
@@ -124,7 +159,7 @@ export async function getPrimaryServiceBoard(): Promise<ServiceBoardView> {
   const patientMap = new Map(patients.map((patient) => [patient.id, patient.fullName]));
   const professionalMap = new Map(professionals.map((professional) => [professional.id, professional.name]));
 
-  return {
+  const mappedBoard: ServiceBoardView = {
     id: board.id,
     name: board.name,
     description: board.description ?? "",
@@ -133,21 +168,25 @@ export async function getPrimaryServiceBoard(): Promise<ServiceBoardView> {
       name: column.name,
       color: column.color ?? "#0A3F9A",
       position: column.position,
-      cards: column.cards.map((card): ServiceCardView => ({
-        id: card.id,
-        title: card.title,
-        description: card.description,
-        patientId: card.patientId,
-        patientName: card.patientId ? patientMap.get(card.patientId) ?? "Paciente nao encontrado" : "Sem paciente",
-        professionalId: card.professionalId,
-        professionalName: card.professionalId
-          ? professionalMap.get(card.professionalId) ?? "Profissional nao encontrado"
-          : "Sem profissional",
-        priority: card.priority,
-        dueDate: formatDate(card.dueDate)
-      }))
+      cards: column.cards.map(
+        (card): ServiceCardView => ({
+          id: card.id,
+          title: card.title,
+          description: card.description,
+          patientId: card.patientId,
+          patientName: card.patientId ? patientMap.get(card.patientId) ?? "Paciente nao encontrado" : "Sem paciente",
+          professionalId: card.professionalId,
+          professionalName: card.professionalId
+            ? professionalMap.get(card.professionalId) ?? "Profissional nao encontrado"
+            : "Sem profissional",
+          priority: card.priority,
+          dueDate: formatDate(card.dueDate)
+        })
+      )
     }))
   };
+
+  return filterBoard(mappedBoard, filters);
 }
 
 export async function createServiceCard(input: CreateServiceCardInput) {
@@ -176,7 +215,7 @@ export async function createServiceCard(input: CreateServiceCardInput) {
     throw new Error("Nenhum board de servicos encontrado.");
   }
 
-  const card = await prisma.serviceCard.create({
+  return prisma.serviceCard.create({
     data: {
       tenantId,
       columnId: input.columnId,
@@ -188,8 +227,6 @@ export async function createServiceCard(input: CreateServiceCardInput) {
       dueDate: input.dueDate ? new Date(input.dueDate) : null
     }
   });
-
-  return card;
 }
 
 export async function moveServiceCard(cardId: string, columnId: string) {
@@ -216,7 +253,7 @@ export async function moveServiceCard(cardId: string, columnId: string) {
     return null;
   }
 
-  const card = await prisma.serviceCard.update({
+  return prisma.serviceCard.update({
     where: {
       id: cardId
     },
@@ -224,6 +261,4 @@ export async function moveServiceCard(cardId: string, columnId: string) {
       columnId
     }
   });
-
-  return card;
 }

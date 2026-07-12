@@ -29,3 +29,12 @@ export type CreateFinancialEntryInput = {
   type: "INCOME" | "EXPENSE";
   status?: "PENDING" | "PAID" | "OVERDUE" | "CANCELED" | "SCHEDULED";
 };
+
+export type FinancialFiltersInput = {
+  type?: "INCOME" | "EXPENSE";
+  status?: "PENDING" | "PAID" | "OVERDUE" | "CANCELED" | "SCHEDULED";
+  year?: number;
+  month?: number;
+  dateFrom?: string;
+  dateTo?: string;
+};

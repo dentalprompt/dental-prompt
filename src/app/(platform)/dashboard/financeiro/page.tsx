@@ -14,12 +14,16 @@ export default async function FinancialPage({
   searchParams?: Promise<{
     type?: "INCOME" | "EXPENSE";
     status?: "PENDING" | "PAID" | "OVERDUE" | "CANCELED" | "SCHEDULED";
+    year?: string;
+    month?: string;
   }>;
 }) {
   const params = await searchParams;
   const filters = {
     type: params?.type,
-    status: params?.status
+    status: params?.status,
+    year: params?.year ? Number(params.year) : undefined,
+    month: params?.month ? Number(params.month) : undefined
   };
 
   const [entries, summary, patients, professionals] = await Promise.all([
@@ -38,7 +42,7 @@ export default async function FinancialPage({
             <div className="space-y-2">
               <CardTitle>Financeiro</CardTitle>
               <CardDescription>
-                Base inicial do financeiro com receitas, despesas, fluxo de caixa e estrutura pronta para transacoes, comissoes e nota fiscal.
+                Acompanhe receitas, despesas e saldo da clinica com filtros por tipo, status e competencia mensal.
               </CardDescription>
             </div>
           </div>

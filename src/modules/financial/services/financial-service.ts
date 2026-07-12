@@ -3,19 +3,43 @@ import { prisma } from "@/lib/db/prisma";
 import { mockFinancialEntries } from "@/modules/financial/data/mock-financial";
 import type {
   CreateFinancialEntryInput,
+  FinancialFiltersInput,
   FinancialEntryItem,
   FinancialSummary
 } from "@/modules/financial/types/financial";
 
-type FinancialFilters = {
-  type?: "INCOME" | "EXPENSE";
-  status?: "PENDING" | "PAID" | "OVERDUE" | "CANCELED" | "SCHEDULED";
-};
+function isWithinRange(date: string, filters: FinancialFiltersInput) {
+  const currentDate = new Date(date);
 
-function applyMockFilters(entries: FinancialEntryItem[], filters: FinancialFilters) {
+  if (filters.year && currentDate.getUTCFullYear() !== filters.year) {
+    return false;
+  }
+
+  if (filters.month && currentDate.getUTCMonth() + 1 !== filters.month) {
+    return false;
+  }
+
+  if (filters.dateFrom && currentDate < new Date(filters.dateFrom)) {
+    return false;
+  }
+
+  if (filters.dateTo) {
+    const endDate = new Date(filters.dateTo);
+    endDate.setUTCHours(23, 59, 59, 999);
+
+    if (currentDate > endDate) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function applyMockFilters(entries: FinancialEntryItem[], filters: FinancialFiltersInput) {
   return entries.filter((entry) => {
     if (filters.type && entry.type !== filters.type) return false;
     if (filters.status && entry.status !== filters.status) return false;
+    if (!isWithinRange(entry.dueDate ?? entry.date, filters)) return false;
     return true;
   });
 }
@@ -31,7 +55,7 @@ function getSummary(entries: FinancialEntryItem[]): FinancialSummary {
   };
 }
 
-export async function listFinancialEntries(filters: FinancialFilters = {}): Promise<FinancialEntryItem[]> {
+export async function listFinancialEntries(filters: FinancialFiltersInput = {}): Promise<FinancialEntryItem[]> {
   if (!process.env.DATABASE_URL) {
     return applyMockFilters(mockFinancialEntries, filters);
   }
@@ -42,11 +66,46 @@ export async function listFinancialEntries(filters: FinancialFilters = {}): Prom
     return [];
   }
 
+  const createdAtFilter =
+    filters.year || filters.month || filters.dateFrom || filters.dateTo
+      ? {
+          gte: filters.dateFrom
+            ? new Date(filters.dateFrom)
+            : filters.year
+              ? new Date(Date.UTC(filters.year, (filters.month ?? 1) - 1, 1))
+              : filters.month
+                ? new Date(Date.UTC(new Date().getUTCFullYear(), filters.month - 1, 1))
+                : undefined,
+          lte: filters.dateTo
+            ? (() => {
+                const endDate = new Date(filters.dateTo);
+                endDate.setUTCHours(23, 59, 59, 999);
+                return endDate;
+              })()
+            : filters.year
+              ? new Date(
+                  Date.UTC(
+                    filters.year,
+                    filters.month ? filters.month : 12,
+                    0,
+                    23,
+                    59,
+                    59,
+                    999
+                  )
+                )
+              : filters.month
+                ? new Date(Date.UTC(new Date().getUTCFullYear(), filters.month, 0, 23, 59, 59, 999))
+                : undefined
+        }
+      : undefined;
+
   const entries = await prisma.financialEntry.findMany({
     where: {
       tenantId,
       type: filters.type,
-      status: filters.status
+      status: filters.status,
+      createdAt: createdAtFilter
     },
     include: {
       patient: true,
@@ -72,7 +131,7 @@ export async function listFinancialEntries(filters: FinancialFilters = {}): Prom
   }));
 }
 
-export async function getFinancialSummary(filters: FinancialFilters = {}): Promise<FinancialSummary> {
+export async function getFinancialSummary(filters: FinancialFiltersInput = {}): Promise<FinancialSummary> {
   const entries = await listFinancialEntries(filters);
   return getSummary(entries);
 }

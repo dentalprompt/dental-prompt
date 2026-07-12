@@ -36,3 +36,11 @@ export type CreateServiceCardInput = {
   dueDate?: string;
   columnId: string;
 };
+
+export type ServiceBoardFilters = {
+  search?: string;
+  patientId?: string;
+  professionalId?: string;
+  priority?: ServicePriority;
+  columnId?: string;
+};

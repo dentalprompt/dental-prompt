@@ -151,6 +151,50 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
   };
 }
 
+export async function getAppointmentById(id: string): Promise<AppointmentListItem | null> {
+  if (!process.env.DATABASE_URL) {
+    return mockAppointments.find((appointment) => appointment.id === id) ?? null;
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const appointment = await prisma.appointment.findUnique({
+    where: {
+      id
+    },
+    include: {
+      patient: true,
+      professional: true
+    }
+  });
+
+  if (!appointment || appointment.tenantId !== tenantId) {
+    return null;
+  }
+
+  return {
+    id: appointment.id,
+    title: appointment.title,
+    startsAt: appointment.startsAt.toISOString(),
+    endsAt: appointment.endsAt.toISOString(),
+    status: appointment.status,
+    patient: {
+      id: appointment.patient.id,
+      fullName: appointment.patient.fullName
+    },
+    professional: {
+      id: appointment.professional.id,
+      name: appointment.professional.name,
+      specialty: appointment.professional.specialty
+    },
+    notes: appointment.notes
+  };
+}
+
 export async function updateAppointment(
   id: string,
   input: UpdateAppointmentInput

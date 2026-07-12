@@ -1,5 +1,7 @@
+import { AuditAction } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import { getRequestSession } from "@/lib/auth/request-session";
 import { createPlanSchema } from "@/modules/plans/schemas/plan-schema";
 import { createPlan, listPlans } from "@/modules/plans/services/plan-service";
@@ -30,6 +32,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const values = createPlanSchema.parse(body);
     const plan = await createPlan(values);
+    await recordAuditLog({
+      session,
+      request,
+      module: "plans",
+      action: AuditAction.CREATE,
+      recordType: "Plan",
+      recordId: plan.id,
+      next: plan
+    });
 
     return NextResponse.json({ data: plan }, { status: 201 });
   } catch {

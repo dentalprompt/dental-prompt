@@ -1,5 +1,7 @@
+import { AuditAction } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import { getRequestSession } from "@/lib/auth/request-session";
 import { createAppointmentSchema } from "@/modules/appointments/schemas/appointment-schema";
 import { createAppointment, listAppointments } from "@/modules/appointments/services/appointment-service";
@@ -31,6 +33,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const values = createAppointmentSchema.parse(body);
     const appointment = await createAppointment(values);
+    await recordAuditLog({
+      session,
+      request,
+      module: "appointments",
+      action: AuditAction.CREATE,
+      recordType: "Appointment",
+      recordId: appointment.id,
+      next: appointment
+    });
 
     return NextResponse.json({ data: appointment }, { status: 201 });
   } catch {

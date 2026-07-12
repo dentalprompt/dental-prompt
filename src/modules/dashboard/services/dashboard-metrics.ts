@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { AppointmentStatus, FinancialEntryStatus, FinancialEntryType, PatientStatus } from "@prisma/client";
 
 import { resolveTenantId } from "@/lib/auth/tenant-resolver";
@@ -252,7 +254,7 @@ function buildMockMetrics(): DashboardMetrics {
   };
 }
 
-export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+export const getDashboardMetrics = cache(async (): Promise<DashboardMetrics> => {
   if (!process.env.DATABASE_URL) {
     return buildMockMetrics();
   }
@@ -743,4 +745,4 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     attentionItems,
     professionalPerformance
   };
-}
+});

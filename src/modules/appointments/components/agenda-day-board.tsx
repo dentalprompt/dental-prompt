@@ -46,7 +46,7 @@ export function AgendaDayBoard({
               Visualizacao operacional simplificada com base pronta para semana, mes e drag and drop.
             </CardDescription>
           </div>
-          <div className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white">
+          <div className="rounded-2xl border border-white/60 bg-white/55 px-4 py-3 text-sm font-medium text-slate-700 backdrop-blur-md">
             {format(new Date(`${date}T12:00:00`), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
           </div>
         </CardHeader>

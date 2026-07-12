@@ -600,6 +600,107 @@ async function main() {
       )
   );
 
+  const serviceBoard = await prisma.serviceBoard.upsert({
+    where: { id: "service_board_demo_1" },
+    update: {
+      name: "Fluxo principal",
+      description: "Kanban operacional da clinica."
+    },
+    create: {
+      id: "service_board_demo_1",
+      tenantId: tenant.id,
+      name: "Fluxo principal",
+      description: "Kanban operacional da clinica."
+    }
+  });
+
+  const serviceColumns = await Promise.all(
+    [
+      { id: "service_column_demo_1", name: "Novo servico", color: "#0A3F9A", position: 1 },
+      { id: "service_column_demo_2", name: "Em producao", color: "#22C7C7", position: 2 },
+      { id: "service_column_demo_3", name: "Laboratorio", color: "#F59E0B", position: 3 },
+      { id: "service_column_demo_4", name: "Concluido", color: "#16A34A", position: 4 }
+    ].map((column) =>
+      prisma.serviceColumn.upsert({
+        where: { id: column.id },
+        update: {
+          boardId: serviceBoard.id,
+          name: column.name,
+          color: column.color,
+          position: column.position
+        },
+        create: {
+          id: column.id,
+          boardId: serviceBoard.id,
+          name: column.name,
+          color: column.color,
+          position: column.position
+        }
+      })
+    )
+  );
+
+  await Promise.all(
+    [
+      patientOne && {
+        id: "service_card_demo_1",
+        columnId: serviceColumns[0].id,
+        patientId: patientOne.id,
+        professionalId: professionals[0].id,
+        title: "Clareamento supervisionado",
+        description: "Paciente aguardando inicio da sequencia clinica.",
+        priority: "NORMAL" as const,
+        dueDate: new Date("2026-07-15T10:00:00.000Z")
+      },
+      patientTwo && {
+        id: "service_card_demo_2",
+        columnId: serviceColumns[1].id,
+        patientId: patientTwo.id,
+        professionalId: professionals[1].id,
+        title: "Manutencao ortodontica especial",
+        description: "Separar material e validar agenda para atendimento estendido.",
+        priority: "HIGH" as const,
+        dueDate: new Date("2026-07-16T11:00:00.000Z")
+      },
+      patientThree && {
+        id: "service_card_demo_3",
+        columnId: serviceColumns[2].id,
+        patientId: patientThree.id,
+        professionalId: professionals[2].id,
+        title: "Planejamento implantodontico",
+        description: "Aguardando retorno do laboratorio com estrutura protetica.",
+        priority: "URGENT" as const,
+        dueDate: new Date("2026-07-18T09:00:00.000Z")
+      }
+    ]
+      .filter(isPresent)
+      .map((card) =>
+        prisma.serviceCard.upsert({
+          where: { id: card.id },
+          update: {
+            columnId: card.columnId,
+            patientId: card.patientId,
+            professionalId: card.professionalId,
+            title: card.title,
+            description: card.description,
+            priority: card.priority,
+            dueDate: card.dueDate
+          },
+          create: {
+            id: card.id,
+            tenantId: tenant.id,
+            columnId: card.columnId,
+            patientId: card.patientId,
+            professionalId: card.professionalId,
+            title: card.title,
+            description: card.description,
+            priority: card.priority,
+            dueDate: card.dueDate
+          }
+        })
+      )
+  );
+
   console.log("Seed concluido com tenant, admin, pacientes, profissionais, conversas, agenda, financeiro e agentes demo.");
 }
 

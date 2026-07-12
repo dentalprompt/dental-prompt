@@ -120,7 +120,7 @@ export async function DashboardOverview() {
               </div>
             </div>
 
-            <div className="flex h-72 items-end gap-3 rounded-[1.5rem] bg-slate-950 p-6">
+            <div className="flex h-72 items-end gap-3 rounded-[1.5rem] border border-white/60 bg-white/40 p-6 shadow-inner shadow-cyan-100/40 backdrop-blur-md">
               {metrics.revenueTrend.map((item) => (
                 <div key={item.label} className="flex flex-1 flex-col items-center gap-3">
                   <div className="flex h-full w-full items-end">
@@ -130,8 +130,8 @@ export async function DashboardOverview() {
                     />
                   </div>
                   <div className="space-y-1 text-center">
-                    <p className="text-xs font-semibold text-white">{item.label}</p>
-                    <span className="text-[11px] text-slate-300">{formatCurrency(item.value)}</span>
+                    <p className="text-xs font-semibold text-slate-800">{item.label}</p>
+                    <span className="text-[11px] text-slate-500">{formatCurrency(item.value)}</span>
                   </div>
                 </div>
               ))}
@@ -148,21 +148,21 @@ export async function DashboardOverview() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="rounded-[1.25rem] bg-slate-950 p-5 text-white">
+            <div className="rounded-[1.25rem] border border-white/60 bg-gradient-to-br from-white/55 via-cyan-50/75 to-white/45 p-5 text-slate-950 backdrop-blur-md">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm text-slate-300">Meta atual</p>
+                  <p className="text-sm text-slate-500">Meta atual</p>
                   <p className="mt-2 text-3xl font-bold">{formatCurrency(metrics.monthlyGoal)}</p>
                 </div>
-                <TrendingUp className="size-8 text-cyan-300" />
+                <TrendingUp className="size-8 text-cyan-500" />
               </div>
-              <div className="mt-5 h-3 rounded-full bg-white/15">
+              <div className="mt-5 h-3 rounded-full bg-slate-200/80">
                 <div
                   className="h-3 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
                   style={{ width: `${Math.min(metrics.monthlyGoalProgress, 100)}%` }}
                 />
               </div>
-              <p className="mt-3 text-sm text-slate-200">
+              <p className="mt-3 text-sm text-slate-600">
                 {metrics.monthlyGoalProgress.toFixed(1)}% atingido ate agora
               </p>
             </div>

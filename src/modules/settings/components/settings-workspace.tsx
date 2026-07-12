@@ -47,6 +47,7 @@ function SettingsCollectionSection({
   const [formValues, setFormValues] = useState<Record<string, string>>(
     Object.fromEntries(fields.map((field) => [field.key, ""]))
   );
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -70,8 +71,8 @@ function SettingsCollectionSection({
     setIsSubmitting(true);
 
     try {
-      await fetch(endpoint, {
-        method: "POST",
+      await fetch(editingId ? `${endpoint}/${editingId}` : endpoint, {
+        method: editingId ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json"
         },
@@ -79,19 +80,33 @@ function SettingsCollectionSection({
       });
 
       setFormValues(Object.fromEntries(fields.map((field) => [field.key, ""])));
+      setEditingId(null);
       await loadItems();
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function handleToggle(id: string) {
-    await fetch(`${endpoint}/${id}`, { method: "PATCH" });
-    await loadItems();
+  function handleEdit(item: Record<string, unknown>) {
+    setEditingId(String(item.id));
+    setFormValues(
+      Object.fromEntries(
+        fields.map((field) => [field.key, String(item[field.key] ?? "")])
+      )
+    );
   }
+
+  async function handleToggle(id: string) {
+      await fetch(`${endpoint}/${id}`, { method: "PATCH" });
+      await loadItems();
+    }
 
   async function handleDelete(id: string) {
     await fetch(`${endpoint}/${id}`, { method: "DELETE" });
+    if (editingId === id) {
+      setEditingId(null);
+      setFormValues(Object.fromEntries(fields.map((field) => [field.key, ""])));
+    }
     await loadItems();
   }
 
@@ -109,8 +124,10 @@ function SettingsCollectionSection({
               <Icon className="size-5" />
             </span>
             <div>
-              <p className="font-semibold text-slate-950">Novo registro</p>
-              <p className="text-sm text-slate-500">Cadastre um novo item desta sub aba.</p>
+              <p className="font-semibold text-slate-950">{editingId ? "Editar registro" : "Novo registro"}</p>
+              <p className="text-sm text-slate-500">
+                {editingId ? "Atualize os dados deste item." : "Cadastre um novo item desta sub aba."}
+              </p>
             </div>
           </div>
 
@@ -146,10 +163,24 @@ function SettingsCollectionSection({
             </div>
           ))}
 
-          <Button type="submit" disabled={isSubmitting}>
-            <Plus className="size-4" />
-            {isSubmitting ? "Salvando..." : `Adicionar ${title}`}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={isSubmitting}>
+              <Plus className="size-4" />
+              {isSubmitting ? "Salvando..." : editingId ? `Salvar ${title}` : `Adicionar ${title}`}
+            </Button>
+            {editingId ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditingId(null);
+                  setFormValues(Object.fromEntries(fields.map((field) => [field.key, ""])));
+                }}
+              >
+                Cancelar edicao
+              </Button>
+            ) : null}
+          </div>
         </form>
 
         <div className="space-y-3">
@@ -168,6 +199,9 @@ function SettingsCollectionSection({
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" onClick={() => handleEdit(item)}>
+                      Editar
+                    </Button>
                     <Button type="button" variant="outline" onClick={() => handleToggle(String(item.id))}>
                       {item.isActive ? "Desativar" : "Ativar"}
                     </Button>

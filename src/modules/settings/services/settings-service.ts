@@ -150,6 +150,32 @@ export async function createAnamnesisTemplate(values: Omit<AnamnesisTemplateItem
   };
 }
 
+export async function updateAnamnesisTemplate(id: string, values: Omit<AnamnesisTemplateItem, "id" | "isActive">) {
+  const tenantId = await resolveTenantId();
+  const current = await prisma.anamnesisTemplate.findUnique({ where: { id } });
+
+  if (!tenantId || !current || current.tenantId !== tenantId) {
+    throw new Error("Registro nao encontrado.");
+  }
+
+  const item = await prisma.anamnesisTemplate.update({
+    where: { id },
+    data: {
+      name: values.name,
+      description: values.description || null,
+      specialty: values.specialty || null
+    }
+  });
+
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description ?? "",
+    specialty: item.specialty ?? "",
+    isActive: item.isActive
+  };
+}
+
 export async function toggleAnamnesisTemplate(id: string) {
   const tenantId = await resolveTenantId();
   const current = await prisma.anamnesisTemplate.findUnique({ where: { id } });
@@ -207,6 +233,34 @@ export async function createContractTemplate(values: Omit<ContractTemplateItem, 
   const item = await prisma.contractTemplate.create({
     data: {
       tenantId,
+      name: values.name,
+      description: values.description || null,
+      category: values.category || null,
+      content: values.content
+    }
+  });
+
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description ?? "",
+    category: item.category ?? "",
+    content: item.content,
+    isActive: item.isActive
+  };
+}
+
+export async function updateContractTemplate(id: string, values: Omit<ContractTemplateItem, "id" | "isActive">) {
+  const tenantId = await resolveTenantId();
+  const current = await prisma.contractTemplate.findUnique({ where: { id } });
+
+  if (!tenantId || !current || current.tenantId !== tenantId) {
+    throw new Error("Registro nao encontrado.");
+  }
+
+  const item = await prisma.contractTemplate.update({
+    where: { id },
+    data: {
       name: values.name,
       description: values.description || null,
       category: values.category || null,
@@ -304,6 +358,38 @@ export async function createFinancialAccount(values: Omit<FinancialAccountItem, 
   };
 }
 
+export async function updateFinancialAccount(id: string, values: Omit<FinancialAccountItem, "id" | "isActive">) {
+  const tenantId = await resolveTenantId();
+  const current = await prisma.financialAccount.findUnique({ where: { id } });
+
+  if (!tenantId || !current || current.tenantId !== tenantId) {
+    throw new Error("Registro nao encontrado.");
+  }
+
+  const item = await prisma.financialAccount.update({
+    where: { id },
+    data: {
+      name: values.name,
+      bank: values.bank || null,
+      agency: values.agency || null,
+      account: values.account || null,
+      type: values.type,
+      initialBalance: values.initialBalance
+    }
+  });
+
+  return {
+    id: item.id,
+    name: item.name,
+    bank: item.bank ?? "",
+    agency: item.agency ?? "",
+    account: item.account ?? "",
+    type: item.type,
+    initialBalance: Number(item.initialBalance),
+    isActive: item.isActive
+  };
+}
+
 export async function toggleFinancialAccount(id: string) {
   const tenantId = await resolveTenantId();
   const current = await prisma.financialAccount.findUnique({ where: { id } });
@@ -362,6 +448,36 @@ export async function createChair(values: Omit<ChairItem, "id" | "isActive">) {
   const item = await prisma.chair.create({
     data: {
       tenantId,
+      name: values.name,
+      code: values.code || null,
+      room: values.room || null,
+      color: values.color || null,
+      notes: values.notes || null
+    }
+  });
+
+  return {
+    id: item.id,
+    name: item.name,
+    code: item.code ?? "",
+    room: item.room ?? "",
+    color: item.color ?? "",
+    notes: item.notes ?? "",
+    isActive: item.isActive
+  };
+}
+
+export async function updateChairItem(id: string, values: Omit<ChairItem, "id" | "isActive">) {
+  const tenantId = await resolveTenantId();
+  const current = await prisma.chair.findUnique({ where: { id } });
+
+  if (!tenantId || !current || current.tenantId !== tenantId) {
+    throw new Error("Registro nao encontrado.");
+  }
+
+  const item = await prisma.chair.update({
+    where: { id },
+    data: {
       name: values.name,
       code: values.code || null,
       room: values.room || null,

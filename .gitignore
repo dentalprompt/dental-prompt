@@ -2,7 +2,10 @@
 node_modules
 .env
 .env.local
+.env.*
 dist
 coverage
 *.log
 generated
+.vercel
+!.env.example

@@ -90,12 +90,108 @@ export async function DashboardOverview() {
         })}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.55fr_0.95fr]">
+      <section>
+        <Card className="border-white/70 bg-white/92">
+          <CardHeader className="space-y-2">
+            <Badge>Operacao</Badge>
+            <CardTitle>Resumo do dia</CardTitle>
+            <CardDescription>Leitura rapida das frentes que estao em andamento agora.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <div className="flex items-center gap-3">
+                <MessageCircleMore className="size-5 text-primary" />
+                <div>
+                  <p className="text-sm text-slate-500">Conversas abertas</p>
+                  <p className="text-xl font-semibold text-slate-950">{formatCompactNumber(metrics.conversations)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <div className="flex items-center gap-3">
+                <CircleDollarSign className="size-5 text-emerald-600" />
+                <div>
+                  <p className="text-sm text-slate-500">Recebimentos pendentes</p>
+                  <p className="text-xl font-semibold text-slate-950">{formatCurrency(metrics.pendingRevenue)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <div className="flex items-center gap-3">
+                <Sparkles className="size-5 text-cyan-600" />
+                <div>
+                  <p className="text-sm text-slate-500">Agentes ativos</p>
+                  <p className="text-xl font-semibold text-slate-950">{formatCompactNumber(metrics.activeAgents)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <div className="flex items-center gap-3">
+                <UserRoundPlus className="size-5 text-primary" />
+                <div>
+                  <p className="text-sm text-slate-500">Pacientes inativos</p>
+                  <p className="text-xl font-semibold text-slate-950">{formatCompactNumber(metrics.inactivePatients)}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section>
+        <Card className="border-white/70 bg-white/92">
+          <CardHeader className="space-y-2">
+            <Badge variant="success">Meta do mes</Badge>
+            <CardTitle>Progresso comercial</CardTitle>
+            <CardDescription>Panorama comercial consolidado para leitura imediata da meta atual.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-[1.5rem] border border-white/60 bg-gradient-to-r from-white/55 via-cyan-50/75 to-white/45 p-5 backdrop-blur-md">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="size-6 text-cyan-500" />
+                    <p className="text-sm font-medium uppercase tracking-[0.16em] text-slate-500">Meta atual</p>
+                  </div>
+                  <p className="text-3xl font-bold text-slate-950">{formatCurrency(metrics.monthlyGoal)}</p>
+                  <p className="text-sm text-slate-600">{metrics.monthlyGoalProgress.toFixed(1)}% atingido ate agora</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-[1.25rem] border border-white/60 bg-white/60 p-4">
+                    <p className="text-sm text-slate-500">Vendido</p>
+                    <p className="mt-1 text-lg font-semibold text-slate-950">{formatCurrency(metrics.monthlyRevenue)}</p>
+                  </div>
+                  <div className="rounded-[1.25rem] border border-white/60 bg-white/60 p-4">
+                    <p className="text-sm text-slate-500">Restante</p>
+                    <p className="mt-1 text-lg font-semibold text-slate-950">{formatCurrency(metrics.monthlyRemainingGoal)}</p>
+                  </div>
+                  <div className="rounded-[1.25rem] border border-white/60 bg-white/60 p-4">
+                    <p className="text-sm text-slate-500">Dias restantes</p>
+                    <p className="mt-1 text-lg font-semibold text-slate-950">{metrics.daysRemainingInMonth}</p>
+                  </div>
+                  <div className="rounded-[1.25rem] border border-white/60 bg-white/60 p-4">
+                    <p className="text-sm text-slate-500">Meta diaria</p>
+                    <p className="mt-1 text-lg font-semibold text-slate-950">{metrics.dailyGoalProgress.toFixed(0)}%</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 h-3 rounded-full bg-slate-200/80">
+                <div
+                  className="h-3 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                  style={{ width: `${Math.min(metrics.monthlyGoalProgress, 100)}%` }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
         <Card className="border-white/70 bg-white/92">
           <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
             <div className="space-y-2">
               <Badge>Receitas</Badge>
-              <CardTitle>Desempenho financeiro</CardTitle>
+              <CardTitle>Desempenho</CardTitle>
               <CardDescription>
                 Estrutura pronta para evoluir com filtros por profissional, plano, tratamento, especialidade e periodo.
               </CardDescription>
@@ -138,72 +234,6 @@ export async function DashboardOverview() {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="border-white/70 bg-white/92">
-          <CardHeader className="space-y-2">
-            <Badge variant="success">Meta do mes</Badge>
-            <CardTitle>Progresso comercial</CardTitle>
-            <CardDescription>
-              Base inicial preparada para a futura criacao de metas personalizadas por mes e ano.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="rounded-[1.25rem] border border-white/60 bg-gradient-to-br from-white/55 via-cyan-50/75 to-white/45 p-5 text-slate-950 backdrop-blur-md">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-slate-500">Meta atual</p>
-                  <p className="mt-2 text-3xl font-bold">{formatCurrency(metrics.monthlyGoal)}</p>
-                </div>
-                <TrendingUp className="size-8 text-cyan-500" />
-              </div>
-              <div className="mt-5 h-3 rounded-full bg-slate-200/80">
-                <div
-                  className="h-3 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
-                  style={{ width: `${Math.min(metrics.monthlyGoalProgress, 100)}%` }}
-                />
-              </div>
-              <p className="mt-3 text-sm text-slate-600">
-                {metrics.monthlyGoalProgress.toFixed(1)}% atingido ate agora
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-[1.25rem] border border-border bg-background p-4">
-                <p className="text-sm text-slate-500">Vendido</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">{formatCurrency(metrics.monthlyRevenue)}</p>
-              </div>
-              <div className="rounded-[1.25rem] border border-border bg-background p-4">
-                <p className="text-sm text-slate-500">Restante</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">
-                  {formatCurrency(metrics.monthlyRemainingGoal)}
-                </p>
-              </div>
-              <div className="rounded-[1.25rem] border border-border bg-background p-4">
-                <p className="text-sm text-slate-500">Dias restantes</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">{metrics.daysRemainingInMonth}</p>
-              </div>
-              <div className="rounded-[1.25rem] border border-border bg-background p-4">
-                <p className="text-sm text-slate-500">Necessario por dia</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">
-                  {formatCurrency(metrics.dailyGoalRequired)}
-                </p>
-              </div>
-              <div className="rounded-[1.25rem] border border-border bg-background p-4">
-                <p className="text-sm text-slate-500">Vendas hoje</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">{formatCurrency(metrics.salesToday)}</p>
-              </div>
-              <div className="rounded-[1.25rem] border border-border bg-background p-4">
-                <p className="text-sm text-slate-500">Meta diaria</p>
-                <p className="mt-1 text-xl font-semibold text-slate-950">
-                  {metrics.dailyGoalProgress.toFixed(0)}%
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr_0.85fr]">
         <Card className="border-white/70 bg-white/92">
           <CardHeader className="space-y-2">
             <Badge variant="info">Pacientes</Badge>
@@ -245,7 +275,45 @@ export async function DashboardOverview() {
             </div>
           </CardContent>
         </Card>
+      </section>
 
+      <section>
+        <Card className="border-white/70 bg-white/92">
+          <CardHeader className="space-y-2">
+            <Badge variant="success">Meta</Badge>
+            <CardTitle>Meta</CardTitle>
+            <CardDescription>Detalhamento completo da meta mensal com foco em execucao e previsibilidade.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">Meta atual</p>
+              <p className="mt-1 text-xl font-semibold text-slate-950">{formatCurrency(metrics.monthlyGoal)}</p>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">Vendido</p>
+              <p className="mt-1 text-xl font-semibold text-slate-950">{formatCurrency(metrics.monthlyRevenue)}</p>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">Restante</p>
+              <p className="mt-1 text-xl font-semibold text-slate-950">{formatCurrency(metrics.monthlyRemainingGoal)}</p>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">Dias restantes</p>
+              <p className="mt-1 text-xl font-semibold text-slate-950">{metrics.daysRemainingInMonth}</p>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">Necessario por dia</p>
+              <p className="mt-1 text-xl font-semibold text-slate-950">{formatCurrency(metrics.dailyGoalRequired)}</p>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">Vendas hoje</p>
+              <p className="mt-1 text-xl font-semibold text-slate-950">{formatCurrency(metrics.salesToday)}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
         <Card className="border-white/70 bg-white/92">
           <CardHeader className="space-y-2">
             <Badge variant="warning">Atencao</Badge>
@@ -281,56 +349,6 @@ export async function DashboardOverview() {
           </CardContent>
         </Card>
 
-        <Card className="border-white/70 bg-white/92">
-          <CardHeader className="space-y-2">
-            <Badge>Operacao</Badge>
-            <CardTitle>Resumo do dia</CardTitle>
-            <CardDescription>Leitura rapida das frentes que estao em andamento agora.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-center gap-3">
-                <MessageCircleMore className="size-5 text-primary" />
-                <div>
-                  <p className="text-sm text-slate-500">Conversas abertas</p>
-                  <p className="text-xl font-semibold text-slate-950">
-                    {formatCompactNumber(metrics.conversations)} total
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-center gap-3">
-                <CircleDollarSign className="size-5 text-emerald-600" />
-                <div>
-                  <p className="text-sm text-slate-500">Recebimentos pendentes</p>
-                  <p className="text-xl font-semibold text-slate-950">{formatCurrency(metrics.pendingRevenue)}</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-center gap-3">
-                <Sparkles className="size-5 text-cyan-600" />
-                <div>
-                  <p className="text-sm text-slate-500">Agentes ativos</p>
-                  <p className="text-xl font-semibold text-slate-950">{formatCompactNumber(metrics.activeAgents)}</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-center gap-3">
-                <UserRoundPlus className="size-5 text-primary" />
-                <div>
-                  <p className="text-sm text-slate-500">Pacientes inativos</p>
-                  <p className="text-xl font-semibold text-slate-950">{formatCompactNumber(metrics.inactivePatients)}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[1.05fr_1.05fr_0.9fr]">
         <Card className="border-white/70 bg-white/92">
           <CardHeader className="space-y-2">
             <Badge variant="success">Agenda</Badge>

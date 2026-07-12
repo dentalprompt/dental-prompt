@@ -11,15 +11,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-hero-grid">
       <div
-        className="container flex flex-col gap-4 py-4 lg:grid lg:gap-6 lg:py-6"
+        className="flex min-h-screen flex-col lg:grid"
         style={{
           gridTemplateColumns: sidebarCollapsed ? "96px minmax(0,1fr)" : "300px minmax(0,1fr)"
         }}
       >
-        <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
+        <div className="lg:sticky lg:top-0 lg:h-screen">
           <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} />
         </div>
-        <div className="space-y-4 lg:space-y-6">
+        <div className="space-y-4 px-4 py-4 lg:space-y-6 lg:px-8 lg:py-6">
           <Topbar />
           <main>{children}</main>
         </div>

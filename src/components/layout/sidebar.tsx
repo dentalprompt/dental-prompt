@@ -46,8 +46,8 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "relative flex h-full w-full flex-col rounded-[1.75rem] border border-white/60 bg-white/50 p-4 shadow-soft backdrop-blur-xl transition-all duration-300",
-        collapsed ? "max-w-24" : "max-w-80"
+        "relative flex h-full w-full flex-col border-r border-white/60 bg-white/38 p-4 shadow-soft backdrop-blur-xl transition-all duration-300",
+        collapsed ? "max-w-24" : "max-w-[300px]"
       )}
     >
       <Button
@@ -55,7 +55,7 @@ export function Sidebar({
         size="icon"
         variant="ghost"
         onClick={onToggle}
-        className="absolute -right-4 top-6 z-10 hidden rounded-full border border-white/70 bg-white/80 text-slate-700 shadow-soft backdrop-blur hover:bg-white lg:inline-flex"
+        className="absolute -right-5 top-6 z-10 hidden rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-soft backdrop-blur hover:bg-white lg:inline-flex"
         aria-label={collapsed ? "Abrir menu lateral" : "Fechar menu lateral"}
       >
         {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
@@ -74,7 +74,7 @@ export function Sidebar({
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center rounded-2xl px-4 py-3 text-sm font-medium transition-all",
+                "flex items-center px-4 py-3 text-sm font-medium transition-all",
                 collapsed ? "justify-center" : "gap-3",
                 isActive
                   ? "bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg shadow-cyan-500/20"
@@ -89,7 +89,7 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="rounded-[1.5rem] border border-white/60 bg-white/45 p-4 backdrop-blur-md">
+      <div className="border border-white/60 bg-white/40 p-4 backdrop-blur-md">
         {collapsed ? (
           <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-primary">DP</p>
         ) : (

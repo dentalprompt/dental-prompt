@@ -1,8 +1,14 @@
+import { AuditAction } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import { getRequestSession } from "@/lib/auth/request-session";
 import { createFinancialEntrySchema } from "@/modules/financial/schemas/financial-schema";
-import { deleteFinancialEntry, updateFinancialEntry } from "@/modules/financial/services/financial-service";
+import {
+  deleteFinancialEntry,
+  getFinancialEntryById,
+  updateFinancialEntry
+} from "@/modules/financial/services/financial-service";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,6 +19,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const { id } = await params;
+    const previousEntry = await getFinancialEntryById(id);
     const body = await request.json();
     const values = createFinancialEntrySchema.parse(body);
     const entry = await updateFinancialEntry(id, values);
@@ -20,6 +27,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!entry) {
       return NextResponse.json({ message: "Lancamento nao encontrado." }, { status: 404 });
     }
+
+    await recordAuditLog({
+      session,
+      request,
+      module: "financial",
+      action: AuditAction.UPDATE,
+      recordType: "FinancialEntry",
+      recordId: entry.id,
+      previous: previousEntry,
+      next: entry
+    });
 
     return NextResponse.json({ data: entry });
   } catch {
@@ -35,11 +53,23 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const { id } = await params;
+  const previousEntry = await getFinancialEntryById(id);
   const result = await deleteFinancialEntry(id);
 
   if (!result) {
     return NextResponse.json({ message: "Lancamento nao encontrado." }, { status: 404 });
   }
+
+  await recordAuditLog({
+    session,
+    request,
+    module: "financial",
+    action: AuditAction.DELETE,
+    recordType: "FinancialEntry",
+    recordId: id,
+    previous: previousEntry,
+    next: result
+  });
 
   return NextResponse.json(result);
 }

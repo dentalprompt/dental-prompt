@@ -137,6 +137,46 @@ export async function getFinancialSummary(filters: FinancialFiltersInput = {}): 
   return getSummary(entries);
 }
 
+export async function getFinancialEntryById(id: string): Promise<FinancialEntryItem | null> {
+  if (!process.env.DATABASE_URL) {
+    return mockFinancialEntries.find((entry) => entry.id === id) ?? null;
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const entry = await prisma.financialEntry.findUnique({
+    where: {
+      id
+    },
+    include: {
+      patient: true,
+      professional: true
+    }
+  });
+
+  if (!entry || entry.tenantId !== tenantId) {
+    return null;
+  }
+
+  return {
+    id: entry.id,
+    description: entry.description,
+    patientName: entry.patient?.fullName ?? null,
+    professionalName: entry.professional?.name ?? null,
+    category: entry.category,
+    paymentMethod: entry.paymentMethod,
+    amount: Number(entry.amount),
+    status: entry.status,
+    type: entry.type,
+    date: entry.createdAt.toISOString(),
+    dueDate: entry.dueDate?.toISOString() ?? null
+  };
+}
+
 export async function createFinancialEntry(input: CreateFinancialEntryInput): Promise<FinancialEntryItem> {
   if (!process.env.DATABASE_URL) {
     return {

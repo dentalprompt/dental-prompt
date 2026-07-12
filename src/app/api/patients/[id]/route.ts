@@ -1,5 +1,7 @@
+import { AuditAction } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import { getRequestSession } from "@/lib/auth/request-session";
 import { createPatientSchema } from "@/modules/patients/schemas/patient-schema";
 import { getPatientDetail } from "@/modules/patients/services/patient-detail-service";
@@ -31,6 +33,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const { id } = await params;
+    const previousPatient = await getPatientDetail(id);
     const body = await request.json();
     const values = createPatientSchema.parse(body);
     const patient = await updatePatient(id, values);
@@ -38,6 +41,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!patient) {
       return NextResponse.json({ message: "Paciente nao encontrado." }, { status: 404 });
     }
+
+    await recordAuditLog({
+      session,
+      request,
+      module: "patients",
+      action: AuditAction.UPDATE,
+      recordType: "Patient",
+      recordId: patient.id,
+      previous: previousPatient,
+      next: patient
+    });
 
     return NextResponse.json({ data: patient });
   } catch {

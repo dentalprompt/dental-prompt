@@ -1,5 +1,7 @@
+import { AuditAction } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import { getRequestSession } from "@/lib/auth/request-session";
 import { createFinancialEntrySchema } from "@/modules/financial/schemas/financial-schema";
 import { createFinancialEntry, listFinancialEntries } from "@/modules/financial/services/financial-service";
@@ -48,6 +50,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const values = createFinancialEntrySchema.parse(body);
     const entry = await createFinancialEntry(values);
+    await recordAuditLog({
+      session,
+      request,
+      module: "financial",
+      action: AuditAction.CREATE,
+      recordType: "FinancialEntry",
+      recordId: entry.id,
+      next: entry
+    });
 
     return NextResponse.json({ data: entry }, { status: 201 });
   } catch {

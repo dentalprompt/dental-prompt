@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import { ACCESS_TOKEN_TTL, AUTH_COOKIE_NAME, REFRESH_TOKEN_TTL, REFRESH_COOKIE_NAME } from "@/lib/auth/constants";
 import { signAccessToken } from "@/lib/auth/jwt";
 import { comparePassword, hashPassword } from "@/lib/auth/password";
@@ -289,6 +290,21 @@ export async function POST(request: Request) {
     }
 
     const roles = user.roles.map((item) => item.role.code);
+    await recordAuditLog({
+      session: {
+        sub: user.id,
+        tenantId: user.tenantId ?? undefined,
+        email: user.email,
+        isSuperAdmin: user.isSuperAdmin,
+        roles
+      },
+      request,
+      module: "auth",
+      action: "LOGIN",
+      recordType: "Session",
+      recordId: user.id,
+      result: "success"
+    });
     return createSessionResponse({
       userId: user.id,
       tenantId: user.tenantId ?? undefined,

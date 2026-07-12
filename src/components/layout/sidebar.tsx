@@ -14,6 +14,7 @@ import {
   MessageSquareText,
   ReceiptText,
   Settings,
+  Shield,
   Stethoscope,
   Users
 } from "lucide-react";
@@ -35,14 +36,23 @@ const items = [
   { href: "/dashboard/configuracoes", label: "Configuracoes", icon: Settings }
 ] satisfies Array<{ href: Route; label: string; icon: LucideIcon }>;
 
+const adminItem = { href: "/dashboard/admin", label: "Admin", icon: Shield } satisfies {
+  href: Route;
+  label: string;
+  icon: LucideIcon;
+};
+
 export function Sidebar({
   collapsed,
-  onToggle
+  onToggle,
+  showAdmin = false
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  showAdmin?: boolean;
 }) {
   const pathname = usePathname();
+  const navigationItems = showAdmin ? [...items, adminItem] : items;
 
   return (
     <aside
@@ -77,7 +87,7 @@ export function Sidebar({
         )}
       </div>
       <nav className="mt-6 flex flex-1 flex-col gap-2">
-        {items.map((item) => {
+        {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 

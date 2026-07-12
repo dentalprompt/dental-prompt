@@ -9,18 +9,28 @@ import { comparePassword, hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { loginSchema } from "@/modules/auth/schemas/login-schema";
 
-const PREVIEW_USER = {
-  id: "preview-user",
-  tenantId: "preview-tenant",
-  email: "admin@dentalprompt.com",
-  password: "admin123",
-  isSuperAdmin: false,
-  roles: ["tenant_admin"]
-};
+const PREVIEW_USERS = [
+  {
+    id: "preview-user",
+    tenantId: "preview-tenant",
+    email: "admin@dentalprompt.com",
+    password: "admin123",
+    isSuperAdmin: false,
+    roles: ["tenant_admin"]
+  },
+  {
+    id: "preview-super-admin",
+    tenantId: undefined,
+    email: "superadmin@dentalprompt.com",
+    password: "admin123",
+    isSuperAdmin: true,
+    roles: ["super_admin"]
+  }
+] as const;
 
-async function ensureSeedUser() {
+async function ensureSeedUser(email: string) {
   const admin = await prisma.user.findUnique({
-    where: { email: "admin@dentalprompt.com" },
+    where: { email },
     include: {
       roles: {
         include: {
@@ -33,6 +43,77 @@ async function ensureSeedUser() {
 
   if (admin) {
     return admin;
+  }
+
+  if (email === "superadmin@dentalprompt.com") {
+    const role = await prisma.role.upsert({
+      where: { code: "super_admin" },
+      update: {},
+      create: {
+        code: "super_admin",
+        name: "Super Admin"
+      }
+    });
+
+    const permissions = await Promise.all(
+      [
+        ["tenants", "manage"],
+        ["users", "manage"],
+        ["audit", "view"],
+        ["billing", "view"],
+        ["dashboard", "view"]
+      ].map(([resource, action]) =>
+        prisma.permission.upsert({
+          where: { resource_action: { resource, action } },
+          update: {},
+          create: {
+            resource,
+            action
+          }
+        })
+      )
+    );
+
+    await Promise.all(
+      permissions.map((permission) =>
+        prisma.rolePermission.upsert({
+          where: {
+            roleId_permissionId: {
+              roleId: role.id,
+              permissionId: permission.id
+            }
+          },
+          update: {},
+          create: {
+            roleId: role.id,
+            permissionId: permission.id
+          }
+        })
+      )
+    );
+
+    return prisma.user.create({
+      data: {
+        name: "Super Admin Dental Prompt",
+        email: "superadmin@dentalprompt.com",
+        passwordHash: await hashPassword("admin123"),
+        status: "ACTIVE",
+        isSuperAdmin: true,
+        roles: {
+          create: {
+            roleId: role.id
+          }
+        }
+      },
+      include: {
+        roles: {
+          include: {
+            role: true
+          }
+        },
+        tenant: true
+      }
+    });
   }
 
   const tenant = await prisma.tenant.upsert({
@@ -165,23 +246,24 @@ export async function POST(request: Request) {
     const body = await request.json();
     const values = loginSchema.parse(body);
     parsedValues = values;
+    const previewUser = PREVIEW_USERS.find((item) => item.email === values.email);
 
     if (!process.env.DATABASE_URL) {
-      if (values.email !== PREVIEW_USER.email || values.password !== PREVIEW_USER.password) {
+      if (!previewUser || values.password !== previewUser.password) {
         return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
       }
 
       return createSessionResponse({
-        userId: PREVIEW_USER.id,
-        tenantId: PREVIEW_USER.tenantId,
-        email: PREVIEW_USER.email,
-        isSuperAdmin: PREVIEW_USER.isSuperAdmin,
-        roles: PREVIEW_USER.roles,
+        userId: previewUser.id,
+        tenantId: previewUser.tenantId,
+        email: previewUser.email,
+        isSuperAdmin: previewUser.isSuperAdmin,
+        roles: [...previewUser.roles],
         persistSession: false
       });
     }
 
-    const seeded = await ensureSeedUser();
+    const seeded = await ensureSeedUser(values.email);
     const user =
       seeded.email === values.email
         ? seeded
@@ -218,17 +300,18 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Prisma.PrismaClientInitializationError) {
       const values = parsedValues;
+      const previewUser = values ? PREVIEW_USERS.find((item) => item.email === values.email) : null;
 
-      if (!values || values.email !== PREVIEW_USER.email || values.password !== PREVIEW_USER.password) {
+      if (!values || !previewUser || values.password !== previewUser.password) {
         return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
       }
 
       return createSessionResponse({
-        userId: PREVIEW_USER.id,
-        tenantId: PREVIEW_USER.tenantId,
-        email: PREVIEW_USER.email,
-        isSuperAdmin: PREVIEW_USER.isSuperAdmin,
-        roles: PREVIEW_USER.roles,
+        userId: previewUser.id,
+        tenantId: previewUser.tenantId,
+        email: previewUser.email,
+        isSuperAdmin: previewUser.isSuperAdmin,
+        roles: [...previewUser.roles],
         persistSession: false
       });
     }

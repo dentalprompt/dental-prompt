@@ -5,7 +5,13 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  showAdmin
+}: {
+  children: React.ReactNode;
+  showAdmin: boolean;
+}) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
@@ -17,7 +23,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }}
       >
         <div className="lg:sticky lg:top-0 lg:h-screen">
-          <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} />
+          <Sidebar
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed((current) => !current)}
+            showAdmin={showAdmin}
+          />
         </div>
         <div className="space-y-4 px-4 py-4 lg:space-y-6 lg:px-8 lg:py-6">
           <Topbar />

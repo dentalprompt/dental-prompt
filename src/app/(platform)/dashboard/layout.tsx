@@ -10,5 +10,5 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
-  return <AppShell>{children}</AppShell>;
+  return <AppShell showAdmin={session.isSuperAdmin}>{children}</AppShell>;
 }

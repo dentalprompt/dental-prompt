@@ -1,3 +1,4 @@
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockPatients } from "@/modules/patients/data/mock-patients";
 import { mockPatientDetails } from "@/modules/patients/data/mock-patient-detail";
@@ -32,6 +33,12 @@ export async function getPatientDetail(id: string): Promise<PatientDetail | null
     );
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
   const patient = await prisma.patient.findUnique({
     where: { id },
     include: {
@@ -52,7 +59,7 @@ export async function getPatientDetail(id: string): Promise<PatientDetail | null
     }
   });
 
-  if (!patient) {
+  if (!patient || patient.tenantId !== tenantId) {
     return null;
   }
 

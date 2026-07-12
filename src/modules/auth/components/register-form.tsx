@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Chrome } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -31,7 +32,9 @@ function formatPhone(value: string) {
 }
 
 export function RegisterForm() {
+  const router = useRouter();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -52,8 +55,27 @@ export function RegisterForm() {
   const phoneValue = watch("phone");
   const formattedPhone = formatPhone(phoneValue ?? "");
 
-  const onSubmit = handleSubmit(async () => {
-    setSuccessMessage("Formulario de cadastro preparado. Na proxima etapa conectaremos a autenticacao real.");
+  const onSubmit = handleSubmit(async (values) => {
+    setServerError(null);
+    setSuccessMessage(null);
+
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(values)
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json()) as { message?: string };
+      setServerError(payload.message ?? "Nao foi possivel concluir o cadastro.");
+      return;
+    }
+
+    setSuccessMessage("Conta criada com sucesso. Redirecionando...");
+    router.push("/dashboard");
+    router.refresh();
   });
 
   return (
@@ -95,9 +117,10 @@ export function RegisterForm() {
             <Input id="password" type="password" placeholder="Crie uma senha" {...register("password")} />
             {errors.password ? <p className="text-sm text-destructive">{errors.password.message}</p> : null}
           </div>
+          {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
           {successMessage ? <p className="text-sm text-emerald-600">{successMessage}</p> : null}
           <Button type="submit" className="h-12 w-full rounded-xl" disabled={isSubmitting}>
-            {isSubmitting ? "Preparando..." : "Cadastrar"}
+            {isSubmitting ? "Cadastrando..." : "Cadastrar"}
           </Button>
           <Button type="button" variant="outline" className="h-12 w-full rounded-xl">
             <Chrome className="size-4" />

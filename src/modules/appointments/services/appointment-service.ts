@@ -1,3 +1,4 @@
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockAppointments } from "@/modules/appointments/data/mock-appointments";
 import type { AppointmentListItem, CreateAppointmentInput } from "@/modules/appointments/types/appointment";
@@ -27,8 +28,15 @@ export async function listAppointments(filters: ListAppointmentsFilters = {}): P
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return [];
+  }
+
   const appointments = await prisma.appointment.findMany({
     where: {
+      tenantId,
       professionalId: filters.professionalId,
       ...(filters.date
         ? {
@@ -97,19 +105,15 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
     };
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    orderBy: {
-      createdAt: "asc"
-    }
-  });
+  const tenantId = await resolveTenantId();
 
-  if (!tenant) {
+  if (!tenantId) {
     throw new Error("Tenant nao encontrado para criar agendamento.");
   }
 
   const appointment = await prisma.appointment.create({
     data: {
-      tenantId: tenant.id,
+      tenantId,
       patientId: input.patientId,
       professionalId: input.professionalId,
       title: input.title,

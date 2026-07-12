@@ -1,3 +1,4 @@
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockFinancialEntries } from "@/modules/financial/data/mock-financial";
 import type {
@@ -35,8 +36,15 @@ export async function listFinancialEntries(filters: FinancialFilters = {}): Prom
     return applyMockFilters(mockFinancialEntries, filters);
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return [];
+  }
+
   const entries = await prisma.financialEntry.findMany({
     where: {
+      tenantId,
       type: filters.type,
       status: filters.status
     },
@@ -86,19 +94,15 @@ export async function createFinancialEntry(input: CreateFinancialEntryInput): Pr
     };
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    orderBy: {
-      createdAt: "asc"
-    }
-  });
+  const tenantId = await resolveTenantId();
 
-  if (!tenant) {
+  if (!tenantId) {
     throw new Error("Tenant nao encontrado para criar lancamento financeiro.");
   }
 
   const entry = await prisma.financialEntry.create({
     data: {
-      tenantId: tenant.id,
+      tenantId,
       patientId: input.patientId,
       professionalId: input.professionalId,
       description: input.description,

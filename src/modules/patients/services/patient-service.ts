@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockPatients } from "@/modules/patients/data/mock-patients";
 import type { CreatePatientInput, PatientListItem } from "@/modules/patients/types/patient";
@@ -23,18 +24,27 @@ export async function listPatients(search?: string): Promise<PatientListItem[]> 
     return filterMockPatients(search);
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return [];
+  }
+
   const patients = await prisma.patient.findMany({
-    where: search
-      ? {
-          OR: [
-            { fullName: { contains: search, mode: "insensitive" } },
-            { chartNumber: { contains: search, mode: "insensitive" } },
-            { cpf: { contains: search, mode: "insensitive" } },
-            { mobilePhone: { contains: search, mode: "insensitive" } },
-            { email: { contains: search, mode: "insensitive" } }
-          ]
-        }
-      : undefined,
+    where: {
+      tenantId,
+      ...(search
+        ? {
+            OR: [
+              { fullName: { contains: search, mode: "insensitive" } },
+              { chartNumber: { contains: search, mode: "insensitive" } },
+              { cpf: { contains: search, mode: "insensitive" } },
+              { mobilePhone: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } }
+            ]
+          }
+        : {})
+    },
     orderBy: {
       createdAt: "desc"
     }
@@ -70,13 +80,9 @@ export async function createPatient(input: CreatePatientInput): Promise<PatientL
     };
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    orderBy: {
-      createdAt: "asc"
-    }
-  });
+  const tenantId = await resolveTenantId();
 
-  if (!tenant) {
+  if (!tenantId) {
     throw new Prisma.PrismaClientKnownRequestError("Tenant not found", {
       code: "P2025",
       clientVersion: "5"
@@ -85,7 +91,7 @@ export async function createPatient(input: CreatePatientInput): Promise<PatientL
 
   const patient = await prisma.patient.create({
     data: {
-      tenantId: tenant.id,
+      tenantId,
       fullName: input.fullName,
       cpf: input.cpf,
       rg: input.rg,

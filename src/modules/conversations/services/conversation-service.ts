@@ -1,3 +1,4 @@
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockConversationDetails, mockConversations } from "@/modules/conversations/data/mock-conversations";
 import type {
@@ -31,15 +32,24 @@ export async function listConversations(search?: string): Promise<ConversationLi
       .sort((a, b) => (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? ""));
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return [];
+  }
+
   const conversations = await prisma.conversation.findMany({
-    where: search
-      ? {
-          OR: [
-            { contactName: { contains: search, mode: "insensitive" } },
-            { contactPhone: { contains: search, mode: "insensitive" } }
-          ]
-        }
-      : undefined,
+    where: {
+      tenantId,
+      ...(search
+        ? {
+            OR: [
+              { contactName: { contains: search, mode: "insensitive" } },
+              { contactPhone: { contains: search, mode: "insensitive" } }
+            ]
+          }
+        : {})
+    },
     include: {
       patient: true,
       messages: {
@@ -73,6 +83,12 @@ export async function getConversationDetail(id: string): Promise<ConversationDet
     return mockConversationDetails[id] ?? null;
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
   const conversation = await prisma.conversation.findUnique({
     where: { id },
     include: {
@@ -85,7 +101,7 @@ export async function getConversationDetail(id: string): Promise<ConversationDet
     }
   });
 
-  if (!conversation) {
+  if (!conversation || conversation.tenantId !== tenantId) {
     return null;
   }
 
@@ -134,9 +150,27 @@ export async function sendMessage(input: SendMessageInput): Promise<Conversation
     };
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: input.conversationId },
+    select: {
+      id: true,
+      tenantId: true
+    }
+  });
+
+  if (!conversation || conversation.tenantId !== tenantId) {
+    return null;
+  }
+
   const message = await prisma.message.create({
     data: {
-      conversationId: input.conversationId,
+      conversationId: conversation.id,
       direction: "OUTBOUND",
       status: "SENT",
       content: input.content,
@@ -145,7 +179,7 @@ export async function sendMessage(input: SendMessageInput): Promise<Conversation
   });
 
   await prisma.conversation.update({
-    where: { id: input.conversationId },
+    where: { id: conversation.id },
     data: {
       lastMessageAt: message.createdAt
     }

@@ -1,3 +1,4 @@
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockAgents } from "@/modules/agents/data/mock-agents";
 import type { AgentListItem, CreateAgentInput } from "@/modules/agents/types/agent";
@@ -16,17 +17,26 @@ export async function listAgents(search?: string): Promise<AgentListItem[]> {
     );
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return [];
+  }
+
   const agents = await prisma.agent.findMany({
-    where: search
-      ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { description: { contains: search, mode: "insensitive" } },
-            { whatsappNumber: { contains: search, mode: "insensitive" } },
-            { model: { contains: search, mode: "insensitive" } }
-          ]
-        }
-      : undefined,
+    where: {
+      tenantId,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { description: { contains: search, mode: "insensitive" } },
+              { whatsappNumber: { contains: search, mode: "insensitive" } },
+              { model: { contains: search, mode: "insensitive" } }
+            ]
+          }
+        : {})
+    },
     orderBy: {
       createdAt: "desc"
     }
@@ -56,19 +66,15 @@ export async function createAgent(input: CreateAgentInput): Promise<AgentListIte
     };
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    orderBy: {
-      createdAt: "asc"
-    }
-  });
+  const tenantId = await resolveTenantId();
 
-  if (!tenant) {
+  if (!tenantId) {
     throw new Error("Tenant nao encontrado para criar agente.");
   }
 
   const agent = await prisma.agent.create({
     data: {
-      tenantId: tenant.id,
+      tenantId,
       name: input.name,
       description: input.description,
       whatsappNumber: input.whatsappNumber,

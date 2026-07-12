@@ -1,5 +1,6 @@
 import { AppointmentStatus, FinancialEntryStatus, FinancialEntryType, PatientStatus } from "@prisma/client";
 
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 
 type TrendPoint = {
@@ -256,6 +257,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     return buildMockMetrics();
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return buildMockMetrics();
+  }
+
   const now = new Date();
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
@@ -281,8 +288,15 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     activeProfessionals,
     recentMessages
   ] = await Promise.all([
-    prisma.patient.count(),
+    prisma.patient.count({
+      where: {
+        tenantId
+      }
+    }),
     prisma.patient.findMany({
+      where: {
+        tenantId
+      },
       select: {
         id: true,
         birthDate: true
@@ -290,6 +304,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     }),
     prisma.patient.count({
       where: {
+        tenantId,
         createdAt: {
           gte: monthStart,
           lte: monthEnd
@@ -298,31 +313,45 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     }),
     prisma.patient.count({
       where: {
+        tenantId,
         status: PatientStatus.IN_TREATMENT
       }
     }),
     prisma.patient.count({
       where: {
+        tenantId,
         status: PatientStatus.INACTIVE
       }
     }),
     prisma.plan.count({
       where: {
+        tenantId,
         isActive: true
       }
     }),
     prisma.agent.count({
       where: {
+        tenantId,
         status: "ACTIVE"
       }
     }),
-    prisma.conversation.count(),
+    prisma.conversation.count({
+      where: {
+        tenantId
+      }
+    }),
     prisma.conversation.aggregate({
+      where: {
+        tenantId
+      },
       _sum: {
         unreadCount: true
       }
     }),
     prisma.conversation.findMany({
+      where: {
+        tenantId
+      },
       orderBy: [
         {
           unreadCount: "desc"
@@ -342,6 +371,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     }),
     prisma.appointment.findMany({
       where: {
+        tenantId,
         startsAt: {
           gte: todayStart,
           lte: todayEnd
@@ -370,6 +400,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     }),
     prisma.appointment.findMany({
       where: {
+        tenantId,
         startsAt: {
           gte: lastSixMonthsStart
         },
@@ -386,6 +417,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     }),
     prisma.financialEntry.findMany({
       where: {
+        tenantId,
         OR: [
           {
             dueDate: {
@@ -416,6 +448,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       }
     }),
     prisma.financialEntry.findMany({
+      where: {
+        tenantId
+      },
       select: {
         id: true,
         type: true,
@@ -440,6 +475,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     }),
     prisma.professional.findMany({
       where: {
+        tenantId,
         isActive: true
       },
       select: {
@@ -449,6 +485,11 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       }
     }),
     prisma.message.findMany({
+      where: {
+        conversation: {
+          tenantId
+        }
+      },
       orderBy: {
         createdAt: "desc"
       },

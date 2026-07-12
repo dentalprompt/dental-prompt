@@ -1,3 +1,4 @@
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockPlanDetails, mockPlans } from "@/modules/plans/data/mock-plans";
 import type {
@@ -33,15 +34,24 @@ export async function listPlans(search?: string): Promise<PlanListItem[]> {
     );
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return [];
+  }
+
   const plans = await prisma.plan.findMany({
-    where: search
-      ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { description: { contains: search, mode: "insensitive" } }
-          ]
-        }
-      : undefined,
+    where: {
+      tenantId,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { description: { contains: search, mode: "insensitive" } }
+            ]
+          }
+        : {})
+    },
     include: {
       procedures: true
     },
@@ -66,6 +76,12 @@ export async function getPlanDetail(id: string): Promise<PlanDetail | null> {
     return mockPlanDetails[id] ?? null;
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
   const plan = await prisma.plan.findUnique({
     where: { id },
     include: {
@@ -75,7 +91,7 @@ export async function getPlanDetail(id: string): Promise<PlanDetail | null> {
     }
   });
 
-  if (!plan) {
+  if (!plan || plan.tenantId !== tenantId) {
     return null;
   }
 
@@ -114,19 +130,15 @@ export async function createPlan(input: CreatePlanInput): Promise<PlanListItem> 
     return mapPlanListFromDetail(detail);
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    orderBy: {
-      createdAt: "asc"
-    }
-  });
+  const tenantId = await resolveTenantId();
 
-  if (!tenant) {
+  if (!tenantId) {
     throw new Error("Tenant nao encontrado para criar plano.");
   }
 
   const plan = await prisma.plan.create({
     data: {
-      tenantId: tenant.id,
+      tenantId,
       name: input.name,
       description: input.description,
       isDefault: input.isDefault ?? false,
@@ -165,6 +177,21 @@ export async function updatePlanProcedure(
       ...procedure,
       ...input
     };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const plan = await prisma.plan.findUnique({
+    where: { id: planId },
+    select: { tenantId: true }
+  });
+
+  if (!plan || plan.tenantId !== tenantId) {
+    return null;
   }
 
   const procedure = await prisma.planProcedure.update({

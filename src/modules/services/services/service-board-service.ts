@@ -1,3 +1,4 @@
+import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import type { CreateServiceCardInput, ServiceBoardView, ServiceCardView } from "@/modules/services/types/service";
 
@@ -57,7 +58,16 @@ export async function getPrimaryServiceBoard(): Promise<ServiceBoardView> {
     return buildMockBoard();
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return buildMockBoard();
+  }
+
   const board = await prisma.serviceBoard.findFirst({
+    where: {
+      tenantId
+    },
     include: {
       columns: {
         include: {
@@ -147,7 +157,16 @@ export async function createServiceCard(input: CreateServiceCardInput) {
     };
   }
 
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    throw new Error("Tenant nao encontrado para criar servico.");
+  }
+
   const board = await prisma.serviceBoard.findFirst({
+    where: {
+      tenantId
+    },
     orderBy: {
       createdAt: "asc"
     }
@@ -159,7 +178,7 @@ export async function createServiceCard(input: CreateServiceCardInput) {
 
   const card = await prisma.serviceCard.create({
     data: {
-      tenantId: board.tenantId,
+      tenantId,
       columnId: input.columnId,
       title: input.title,
       description: input.description,
@@ -176,6 +195,25 @@ export async function createServiceCard(input: CreateServiceCardInput) {
 export async function moveServiceCard(cardId: string, columnId: string) {
   if (!process.env.DATABASE_URL) {
     return { id: cardId, columnId };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const scopedCard = await prisma.serviceCard.findUnique({
+    where: {
+      id: cardId
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!scopedCard || scopedCard.tenantId !== tenantId) {
+    return null;
   }
 
   const card = await prisma.serviceCard.update({

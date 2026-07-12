@@ -4,6 +4,8 @@ export type PatientBudget = {
   date: string;
   professional: string;
   plan: string;
+  description: string;
+  teeth: string[];
   value: number;
   finalValue: number;
   status: "DRAFT" | "SENT" | "APPROVED" | "REJECTED" | "CANCELED" | "FINISHED";

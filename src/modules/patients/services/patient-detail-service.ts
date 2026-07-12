@@ -4,6 +4,24 @@ import { mockPatients } from "@/modules/patients/data/mock-patients";
 import { mockPatientDetails } from "@/modules/patients/data/mock-patient-detail";
 import type { PatientDetail } from "@/modules/patients/types/patient-detail";
 
+function normalizeToothLabel(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  return trimmed;
+}
+
 export async function getPatientDetail(id: string): Promise<PatientDetail | null> {
   if (!process.env.DATABASE_URL) {
     return (
@@ -101,6 +119,13 @@ export async function getPatientDetail(id: string): Promise<PatientDetail | null
   const previousAppointments = patient.appointments.filter((item) => item.startsAt < new Date());
   const nextAppointments = patient.appointments.filter((item) => item.startsAt >= new Date());
   const latestProfessional = nextAppointments[0]?.professional?.name ?? previousAppointments.at(-1)?.professional?.name ?? null;
+  const treatmentTeeth = Array.from(
+    new Set(
+      patient.treatments
+        .map((treatment) => normalizeToothLabel(treatment.tooth))
+        .filter((tooth): tooth is string => Boolean(tooth))
+    )
+  );
   const evolutions = patient.treatments.flatMap((treatment) =>
     treatment.evolutions.map((evolution) => ({
       id: evolution.id,
@@ -125,16 +150,29 @@ export async function getPatientDetail(id: string): Promise<PatientDetail | null
     lastAppointment: previousAppointments.at(-1)?.startsAt.toISOString() ?? null,
     nextAppointment: nextAppointments[0]?.startsAt.toISOString() ?? null,
     notes: patient.notes,
-    budgets: patient.budgets.map((budget) => ({
-      id: budget.id,
-      number: budget.number,
-      date: budget.date.toISOString(),
-      professional: budget.professional?.name ?? "Nao informado",
-      plan: budget.plan?.name ?? "Nao informado",
-      value: Number(budget.value),
-      finalValue: Number(budget.finalValue),
-      status: budget.status
-    })),
+    budgets: patient.budgets.map((budget) => {
+      const budgetTeeth = Array.from(
+        new Set(
+          patient.treatments
+            .filter((treatment) => treatment.updatedAt >= budget.date)
+            .map((treatment) => normalizeToothLabel(treatment.tooth))
+            .filter((tooth): tooth is string => Boolean(tooth))
+        )
+      );
+
+      return {
+        id: budget.id,
+        number: budget.number,
+        date: budget.date.toISOString(),
+        professional: budget.professional?.name ?? "Nao informado",
+        plan: budget.plan?.name ?? "Nao informado",
+        description: "Planejamento financeiro preparado para acompanhamento clinico e futura conversao em execucao.",
+        teeth: budgetTeeth.length ? budgetTeeth : treatmentTeeth.slice(0, 4),
+        value: Number(budget.value),
+        finalValue: Number(budget.finalValue),
+        status: budget.status
+      };
+    }),
     treatments: patient.treatments.map((treatment) => ({
       id: treatment.id,
       procedure: treatment.procedure,

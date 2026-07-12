@@ -23,6 +23,8 @@ export const mockPatientDetails: Record<string, PatientDetail> = {
         date: "2026-07-01",
         professional: "Dra. Camila Borges",
         plan: "Particular Premium",
+        description: "Planejamento estetico com clareamento e reanatomizacao anterior.",
+        teeth: ["11", "12", "21", "22"],
         value: 5200,
         finalValue: 4800,
         status: "APPROVED"
@@ -33,6 +35,8 @@ export const mockPatientDetails: Record<string, PatientDetail> = {
         date: "2026-07-10",
         professional: "Dr. Thiago Salles",
         plan: "Particular Premium",
+        description: "Ajuste ortodontico complementar para alinhamento funcional.",
+        teeth: ["11", "21"],
         value: 1800,
         finalValue: 1800,
         status: "SENT"

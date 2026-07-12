@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
@@ -18,7 +19,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { DentalPromptLogo } from "@/components/brand/dental-prompt-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -61,11 +61,17 @@ export function Sidebar({
         {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
       </Button>
 
-      <div className="border-b border-white/60 pb-4">
-        <DentalPromptLogo
-          className={cn("items-start", collapsed && "items-center")}
-          compact={collapsed}
-          showTagline={false}
+      <div className="flex justify-center border-b border-white/60 pb-4">
+        <Image
+          src="/brand/dental-prompt-sidebar-logo.png"
+          alt="Dental Prompt"
+          width={collapsed ? 56 : 210}
+          height={collapsed ? 56 : 70}
+          priority
+          className={cn(
+            "h-auto object-contain transition-all duration-300",
+            collapsed ? "w-14" : "w-[210px]"
+          )}
         />
       </div>
       <nav className="mt-6 flex flex-1 flex-col gap-2">

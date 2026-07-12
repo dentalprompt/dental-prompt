@@ -27,7 +27,7 @@ export default async function SchedulePage({
         <AgendaProfessionalFilter professionals={professionals} />
         <AppointmentCreateDialog patients={patients} professionals={professionals} />
       </div>
-      <AgendaDayBoard appointments={appointments} date={date} />
+      <AgendaDayBoard appointments={appointments} date={date} patients={patients} professionals={professionals} />
     </div>
   );
 }

@@ -1,7 +1,11 @@
 import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockAppointments } from "@/modules/appointments/data/mock-appointments";
-import type { AppointmentListItem, CreateAppointmentInput } from "@/modules/appointments/types/appointment";
+import type {
+  AppointmentListItem,
+  CreateAppointmentInput,
+  UpdateAppointmentInput
+} from "@/modules/appointments/types/appointment";
 
 type ListAppointmentsFilters = {
   professionalId?: string;
@@ -121,6 +125,99 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
       endsAt: toDateTime(input.date, input.endTime),
       status: input.status ?? "SCHEDULED",
       notes: input.notes
+    },
+    include: {
+      patient: true,
+      professional: true
+    }
+  });
+
+  return {
+    id: appointment.id,
+    title: appointment.title,
+    startsAt: appointment.startsAt.toISOString(),
+    endsAt: appointment.endsAt.toISOString(),
+    status: appointment.status,
+    patient: {
+      id: appointment.patient.id,
+      fullName: appointment.patient.fullName
+    },
+    professional: {
+      id: appointment.professional.id,
+      name: appointment.professional.name,
+      specialty: appointment.professional.specialty
+    },
+    notes: appointment.notes
+  };
+}
+
+export async function updateAppointment(
+  id: string,
+  input: UpdateAppointmentInput
+): Promise<AppointmentListItem | null> {
+  if (!process.env.DATABASE_URL) {
+    const appointment = mockAppointments.find((item) => item.id === id);
+
+    if (!appointment) {
+      return null;
+    }
+
+    return {
+      ...appointment,
+      title: input.title,
+      startsAt: toDateTime(input.date, input.startTime).toISOString(),
+      endsAt: toDateTime(input.date, input.endTime).toISOString(),
+      status: input.status ?? "SCHEDULED",
+      patient: {
+        id: input.patientId,
+        fullName: appointment.patient.id === input.patientId ? appointment.patient.fullName : "Paciente selecionado"
+      },
+      professional: {
+        id: input.professionalId,
+        name:
+          appointment.professional.id === input.professionalId
+            ? appointment.professional.name
+            : "Profissional selecionado",
+        specialty:
+          appointment.professional.id === input.professionalId
+            ? appointment.professional.specialty
+            : null
+      },
+      notes: input.notes ?? null
+    };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const existingAppointment = await prisma.appointment.findUnique({
+    where: {
+      id
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!existingAppointment || existingAppointment.tenantId !== tenantId) {
+    return null;
+  }
+
+  const appointment = await prisma.appointment.update({
+    where: {
+      id
+    },
+    data: {
+      patientId: input.patientId,
+      professionalId: input.professionalId,
+      title: input.title,
+      startsAt: toDateTime(input.date, input.startTime),
+      endsAt: toDateTime(input.date, input.endTime),
+      status: input.status ?? "SCHEDULED",
+      notes: input.notes || null
     },
     include: {
       patient: true,

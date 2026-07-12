@@ -44,3 +44,5 @@ export type CreateAppointmentInput = {
     | "WALK_IN"
     | "RETURN";
 };
+
+export type UpdateAppointmentInput = CreateAppointmentInput;

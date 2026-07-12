@@ -1,9 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
+import { PencilLine, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -23,23 +23,42 @@ import {
   createAppointmentSchema,
   type CreateAppointmentFormValues
 } from "@/modules/appointments/schemas/appointment-schema";
-import type { ProfessionalListItem } from "@/modules/team/types/professional";
+import type { AppointmentListItem } from "@/modules/appointments/types/appointment";
 import type { PatientListItem } from "@/modules/patients/types/patient";
+import type { ProfessionalListItem } from "@/modules/team/types/professional";
 
 type AppointmentCreateDialogProps = {
   patients: PatientListItem[];
   professionals: ProfessionalListItem[];
+  appointment?: AppointmentListItem;
+  trigger?: ReactNode;
 };
+
+function toDateParts(appointment?: AppointmentListItem) {
+  if (!appointment) {
+    return null;
+  }
+
+  return {
+    date: appointment.startsAt.slice(0, 10),
+    startTime: appointment.startsAt.slice(11, 16),
+    endTime: appointment.endsAt.slice(11, 16)
+  };
+}
 
 export function AppointmentCreateDialog({
   patients,
-  professionals
+  professionals,
+  appointment,
+  trigger
 }: AppointmentCreateDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const isEditing = Boolean(appointment);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const dateParts = toDateParts(appointment);
 
   const {
     register,
@@ -49,22 +68,22 @@ export function AppointmentCreateDialog({
   } = useForm<CreateAppointmentFormValues>({
     resolver: zodResolver(createAppointmentSchema),
     defaultValues: {
-      patientId: patients[0]?.id ?? "",
-      professionalId: professionals[0]?.id ?? "",
-      title: "",
-      date: today,
-      startTime: "09:00",
-      endTime: "09:30",
-      notes: "",
-      status: "SCHEDULED"
+      patientId: appointment?.patient.id ?? patients[0]?.id ?? "",
+      professionalId: appointment?.professional.id ?? professionals[0]?.id ?? "",
+      title: appointment?.title ?? "",
+      date: dateParts?.date ?? today,
+      startTime: dateParts?.startTime ?? "09:00",
+      endTime: dateParts?.endTime ?? "09:30",
+      notes: appointment?.notes ?? "",
+      status: appointment?.status ?? "SCHEDULED"
     }
   });
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
 
-    const response = await fetch("/api/appointments", {
-      method: "POST",
+    const response = await fetch(isEditing ? `/api/appointments/${appointment!.id}` : "/api/appointments", {
+      method: isEditing ? "PUT" : "POST",
       headers: {
         "Content-Type": "application/json"
       },
@@ -73,7 +92,7 @@ export function AppointmentCreateDialog({
 
     if (!response.ok) {
       const payload = (await response.json()) as { message?: string };
-      setServerError(payload.message ?? "Nao foi possivel criar o agendamento.");
+      setServerError(payload.message ?? `Nao foi possivel ${isEditing ? "atualizar" : "criar"} o agendamento.`);
       return;
     }
 
@@ -94,16 +113,20 @@ export function AppointmentCreateDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="h-11 rounded-full px-5">
-          <Plus className="size-4" />
-          Novo agendamento
-        </Button>
+        {trigger ?? (
+          <Button className="h-11 rounded-full px-5">
+            <Plus className="size-4" />
+            Novo agendamento
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Criar agendamento</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar agendamento" : "Criar agendamento"}</DialogTitle>
           <DialogDescription>
-            Base inicial do fluxo de agenda, preparada para conflito de horario, encaixe, retorno e integracao futura com financeiro.
+            {isEditing
+              ? "Atualize paciente, profissional, horario e status diretamente pela agenda."
+              : "Base inicial do fluxo de agenda, preparada para conflito de horario, encaixe, retorno e integracao futura com financeiro."}
           </DialogDescription>
         </DialogHeader>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
@@ -157,6 +180,11 @@ export function AppointmentCreateDialog({
               <option value="CONFIRMED">Confirmado</option>
               <option value="RETURN">Retorno</option>
               <option value="WALK_IN">Encaixe</option>
+              <option value="IN_ATTENDANCE">Em atendimento</option>
+              <option value="COMPLETED">Concluido</option>
+              <option value="CANCELED">Cancelado</option>
+              <option value="RESCHEDULED">Remarcado</option>
+              <option value="NO_SHOW">Faltou</option>
             </select>
           </div>
           <div className="space-y-2">
@@ -177,11 +205,34 @@ export function AppointmentCreateDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Salvando..." : "Salvar agendamento"}
+              {isSubmitting ? "Salvando..." : isEditing ? "Salvar alteracoes" : "Salvar agendamento"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function AppointmentEditTrigger({
+  appointment,
+  patients,
+  professionals
+}: {
+  appointment: AppointmentListItem;
+  patients: PatientListItem[];
+  professionals: ProfessionalListItem[];
+}) {
+  return (
+    <AppointmentCreateDialog
+      appointment={appointment}
+      patients={patients}
+      professionals={professionals}
+      trigger={
+        <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3">
+          <PencilLine className="size-4" />
+        </Button>
+      }
+    />
   );
 }

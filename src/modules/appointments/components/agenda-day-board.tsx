@@ -4,7 +4,10 @@ import { CalendarCheck2, Clock3, Plus, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppointmentEditTrigger } from "@/modules/appointments/components/appointment-create-dialog";
 import type { AppointmentListItem } from "@/modules/appointments/types/appointment";
+import type { PatientListItem } from "@/modules/patients/types/patient";
+import type { ProfessionalListItem } from "@/modules/team/types/professional";
 
 const appointmentStatusMap: Record<AppointmentListItem["status"], { label: string; variant: "default" | "success" | "warning" | "info" }> = {
   SCHEDULED: { label: "Agendado", variant: "default" },
@@ -29,10 +32,14 @@ function getMinutesFromIso(value: string) {
 
 export function AgendaDayBoard({
   appointments,
-  date
+  date,
+  patients,
+  professionals
 }: {
   appointments: AppointmentListItem[];
   date: string;
+  patients: PatientListItem[];
+  professionals: ProfessionalListItem[];
 }) {
   const grouped = appointments.reduce<
     Record<string, { specialty: string; items: AppointmentListItem[] }>
@@ -46,7 +53,7 @@ export function AgendaDayBoard({
     return accumulator;
   }, {});
 
-  const professionals = Object.entries(grouped);
+  const professionalColumns = Object.entries(grouped);
   const startHour = 8;
   const endHour = 20;
   const slotHeight = 72;
@@ -89,10 +96,10 @@ export function AgendaDayBoard({
         <CardContent className="p-0">
           <div
             className="grid min-w-[960px]"
-            style={{ gridTemplateColumns: `88px repeat(${Math.max(professionals.length, 1)}, minmax(240px, 1fr))` }}
+            style={{ gridTemplateColumns: `88px repeat(${Math.max(professionalColumns.length, 1)}, minmax(240px, 1fr))` }}
           >
             <div className="border-r border-border/70 bg-white/35" />
-            {professionals.map(([professional, data]) => (
+            {professionalColumns.map(([professional, data]) => (
               <div key={professional} className="border-r border-border/70 bg-white/35 p-4 last:border-r-0">
                 <p className="font-semibold text-slate-950">{professional}</p>
                 <p className="text-sm text-slate-500">{data.specialty}</p>
@@ -111,7 +118,7 @@ export function AgendaDayBoard({
               ))}
             </div>
 
-            {professionals.map(([professional, data]) => (
+            {professionalColumns.map(([professional, data]) => (
               <div key={professional} className="relative border-r border-border/70 last:border-r-0">
                 <div className="absolute inset-0">
                   {Array.from({ length: endHour - startHour }).map((_, index) => (
@@ -156,9 +163,16 @@ export function AgendaDayBoard({
                               <p className="line-clamp-2 text-sm leading-6 text-slate-600">{appointment.notes}</p>
                             ) : null}
                           </div>
-                          <Badge variant={appointmentStatusMap[appointment.status].variant}>
-                            {appointmentStatusMap[appointment.status].label}
-                          </Badge>
+                          <div className="flex flex-col items-end gap-2">
+                            <Badge variant={appointmentStatusMap[appointment.status].variant}>
+                              {appointmentStatusMap[appointment.status].label}
+                            </Badge>
+                            <AppointmentEditTrigger
+                              appointment={appointment}
+                              patients={patients}
+                              professionals={professionals}
+                            />
+                          </div>
                         </div>
                       </div>
                     );

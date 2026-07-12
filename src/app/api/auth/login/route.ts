@@ -9,6 +9,15 @@ import { comparePassword, hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { loginSchema } from "@/modules/auth/schemas/login-schema";
 
+const PREVIEW_USER = {
+  id: "preview-user",
+  tenantId: "preview-tenant",
+  email: "admin@dentalprompt.com",
+  password: "admin123",
+  isSuperAdmin: false,
+  roles: ["tenant_admin"]
+};
+
 async function ensureSeedUser() {
   const admin = await prisma.user.findUnique({
     where: { email: "admin@dentalprompt.com" },
@@ -87,10 +96,90 @@ async function ensureSeedUser() {
   return user;
 }
 
+async function createSessionResponse({
+  userId,
+  tenantId,
+  email,
+  isSuperAdmin,
+  roles,
+  persistSession
+}: {
+  userId: string;
+  tenantId?: string;
+  email: string;
+  isSuperAdmin: boolean;
+  roles: string[];
+  persistSession: boolean;
+}) {
+  const accessToken = signAccessToken(
+    {
+      sub: userId,
+      tenantId,
+      email,
+      isSuperAdmin,
+      roles
+    },
+    ACCESS_TOKEN_TTL
+  );
+
+  const refreshToken = randomUUID();
+
+  if (persistSession) {
+    await prisma.session.create({
+      data: {
+        userId,
+        refreshToken,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL * 1000)
+      }
+    });
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastLoginAt: new Date() }
+    });
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(AUTH_COOKIE_NAME, accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: ACCESS_TOKEN_TTL
+  });
+  cookieStore.set(REFRESH_COOKIE_NAME, refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: REFRESH_TOKEN_TTL
+  });
+
+  return NextResponse.json({ ok: true, mode: persistSession ? "database" : "preview" });
+}
+
 export async function POST(request: Request) {
+  let parsedValues: ReturnType<typeof loginSchema.parse> | null = null;
+
   try {
     const body = await request.json();
     const values = loginSchema.parse(body);
+    parsedValues = values;
+
+    if (!process.env.DATABASE_URL) {
+      if (values.email !== PREVIEW_USER.email || values.password !== PREVIEW_USER.password) {
+        return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
+      }
+
+      return createSessionResponse({
+        userId: PREVIEW_USER.id,
+        tenantId: PREVIEW_USER.tenantId,
+        email: PREVIEW_USER.email,
+        isSuperAdmin: PREVIEW_USER.isSuperAdmin,
+        roles: PREVIEW_USER.roles,
+        persistSession: false
+      });
+    }
 
     const seeded = await ensureSeedUser();
     const user =
@@ -118,58 +207,30 @@ export async function POST(request: Request) {
     }
 
     const roles = user.roles.map((item) => item.role.code);
-    const accessToken = signAccessToken(
-      {
-        sub: user.id,
-        tenantId: user.tenantId ?? undefined,
-        email: user.email,
-        isSuperAdmin: user.isSuperAdmin,
-        roles
-      },
-      ACCESS_TOKEN_TTL
-    );
-
-    const refreshToken = randomUUID();
-
-    await prisma.session.create({
-      data: {
-        userId: user.id,
-        refreshToken,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL * 1000)
-      }
+    return createSessionResponse({
+      userId: user.id,
+      tenantId: user.tenantId ?? undefined,
+      email: user.email,
+      isSuperAdmin: user.isSuperAdmin,
+      roles,
+      persistSession: true
     });
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() }
-    });
-
-    const cookieStore = await cookies();
-    cookieStore.set(AUTH_COOKIE_NAME, accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: ACCESS_TOKEN_TTL
-    });
-    cookieStore.set(REFRESH_COOKIE_NAME, refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: REFRESH_TOKEN_TTL
-    });
-
-    return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientInitializationError) {
-      return NextResponse.json(
-        {
-          message:
-            "DATABASE_URL nao configurada ou banco indisponivel. Configure o ambiente para ativar autenticacao persistente."
-        },
-        { status: 500 }
-      );
+      const values = parsedValues;
+
+      if (!values || values.email !== PREVIEW_USER.email || values.password !== PREVIEW_USER.password) {
+        return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
+      }
+
+      return createSessionResponse({
+        userId: PREVIEW_USER.id,
+        tenantId: PREVIEW_USER.tenantId,
+        email: PREVIEW_USER.email,
+        isSuperAdmin: PREVIEW_USER.isSuperAdmin,
+        roles: PREVIEW_USER.roles,
+        persistSession: false
+      });
     }
 
     return NextResponse.json({ message: "Nao foi possivel concluir o login." }, { status: 400 });

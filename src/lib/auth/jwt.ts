@@ -2,11 +2,13 @@ import jwt from "jsonwebtoken";
 
 import type { AuthTokenPayload } from "@/lib/auth/types";
 
+const FALLBACK_JWT_SECRET = "dental-prompt-preview-secret-change-in-production";
+
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
 
   if (!secret) {
-    throw new Error("JWT_SECRET is not configured.");
+    return FALLBACK_JWT_SECRET;
   }
 
   return secret;

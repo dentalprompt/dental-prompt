@@ -18,10 +18,10 @@ export default async function LoginPage() {
           <DentalPromptLogo className="h-auto w-full" showTagline={false} />
           <div className="space-y-4">
             <h1 className="max-w-2xl text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl">
-              Uma plataforma pensada para a operacao real de clinicas odontologicas.
+              Gestao inteligente para sorrisos saudaveis.
             </h1>
             <p className="max-w-xl text-base leading-8 text-slate-600">
-              Multi-tenant, segura, preparada para IA, WhatsApp, financeiro, agenda, prontuario e crescimento em larga escala.
+              Organize atendimentos, pacientes e resultados da sua clinica em um so lugar, com mais clareza, agilidade e controle no dia a dia.
             </p>
           </div>
         </section>

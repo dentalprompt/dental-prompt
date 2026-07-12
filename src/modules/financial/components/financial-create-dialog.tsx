@@ -1,8 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { PencilLine } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -18,19 +19,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createFinancialEntrySchema, type CreateFinancialEntryFormValues } from "@/modules/financial/schemas/financial-schema";
+import type { FinancialEntryItem } from "@/modules/financial/types/financial";
 import type { PatientListItem } from "@/modules/patients/types/patient";
 import type { ProfessionalListItem } from "@/modules/team/types/professional";
 
-export function FinancialCreateDialog({
-  patients,
-  professionals
-}: {
+type Props = {
   patients: PatientListItem[];
   professionals: ProfessionalListItem[];
-}) {
+  entry?: FinancialEntryItem;
+  trigger?: ReactNode;
+};
+
+export function FinancialCreateDialog({ patients, professionals, entry, trigger }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const isEditing = Boolean(entry);
+
   const {
     register,
     handleSubmit,
@@ -39,23 +44,37 @@ export function FinancialCreateDialog({
   } = useForm<CreateFinancialEntryFormValues>({
     resolver: zodResolver(createFinancialEntrySchema),
     defaultValues: {
-      description: "",
+      description: entry?.description ?? "",
       patientId: "",
       professionalId: "",
-      category: "",
-      paymentMethod: "",
-      amount: 0,
-      dueDate: "",
-      type: "INCOME",
-      status: "PENDING"
+      category: entry?.category ?? "",
+      paymentMethod: entry?.paymentMethod ?? "",
+      amount: entry?.amount ?? 0,
+      dueDate: entry?.dueDate ? entry.dueDate.slice(0, 10) : "",
+      type: entry?.type ?? "INCOME",
+      status: entry?.status ?? "PENDING"
     }
   });
+
+  useEffect(() => {
+    reset({
+      description: entry?.description ?? "",
+      patientId: "",
+      professionalId: "",
+      category: entry?.category ?? "",
+      paymentMethod: entry?.paymentMethod ?? "",
+      amount: entry?.amount ?? 0,
+      dueDate: entry?.dueDate ? entry.dueDate.slice(0, 10) : "",
+      type: entry?.type ?? "INCOME",
+      status: entry?.status ?? "PENDING"
+    });
+  }, [entry, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
 
-    const response = await fetch("/api/financial/entries", {
-      method: "POST",
+    const response = await fetch(isEditing ? `/api/financial/entries/${entry!.id}` : "/api/financial/entries", {
+      method: isEditing ? "PUT" : "POST",
       headers: {
         "Content-Type": "application/json"
       },
@@ -69,25 +88,38 @@ export function FinancialCreateDialog({
 
     if (!response.ok) {
       const payload = (await response.json()) as { message?: string };
-      setServerError(payload.message ?? "Nao foi possivel criar o lancamento.");
+      setServerError(payload.message ?? `Nao foi possivel ${isEditing ? "atualizar" : "criar"} o lancamento.`);
       return;
     }
 
-    reset();
+    if (!isEditing) {
+      reset({
+        description: "",
+        patientId: "",
+        professionalId: "",
+        category: "",
+        paymentMethod: "",
+        amount: 0,
+        dueDate: "",
+        type: "INCOME",
+        status: "PENDING"
+      });
+    }
+
     setOpen(false);
     router.refresh();
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>+ Adicionar</Button>
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger ?? <Button>+ Adicionar</Button>}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Novo lancamento</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar lancamento" : "Novo lancamento"}</DialogTitle>
           <DialogDescription>
-            Cadastro inicial de receitas e despesas preparado para fluxo de caixa, transacoes e futura nota fiscal.
+            {isEditing
+              ? "Atualize tipo, status, descricao, forma de pagamento, vencimento e valor do lancamento."
+              : "Cadastro de receitas e despesas com fluxo pronto para manutencao operacional da clinica."}
           </DialogDescription>
         </DialogHeader>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
@@ -113,6 +145,7 @@ export function FinancialCreateDialog({
               <option value="PAID">Pago</option>
               <option value="SCHEDULED">Agendado</option>
               <option value="OVERDUE">Em atraso</option>
+              <option value="CANCELED">Cancelado</option>
             </select>
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -173,11 +206,27 @@ export function FinancialCreateDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Salvando..." : "Salvar lancamento"}
+              {isSubmitting ? "Salvando..." : isEditing ? "Salvar alteracoes" : "Salvar lancamento"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function FinancialEditTrigger({ entry, patients, professionals }: Props & { entry: FinancialEntryItem }) {
+  return (
+    <FinancialCreateDialog
+      entry={entry}
+      patients={patients}
+      professionals={professionals}
+      trigger={
+        <Button variant="outline" size="sm">
+          <PencilLine className="mr-2 size-4" />
+          Editar
+        </Button>
+      }
+    />
   );
 }

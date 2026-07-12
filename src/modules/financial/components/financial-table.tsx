@@ -1,10 +1,19 @@
+"use client";
+
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
+import { FinancialEditTrigger } from "@/modules/financial/components/financial-create-dialog";
 import type { FinancialEntryItem } from "@/modules/financial/types/financial";
+import type { PatientListItem } from "@/modules/patients/types/patient";
+import type { ProfessionalListItem } from "@/modules/team/types/professional";
 
 const statusMap: Record<
   FinancialEntryItem["status"],
@@ -22,7 +31,34 @@ function formatDate(value: string | null) {
   return format(new Date(value), "dd/MM/yyyy", { locale: ptBR });
 }
 
-export function FinancialTable({ entries }: { entries: FinancialEntryItem[] }) {
+export function FinancialTable({
+  entries,
+  patients,
+  professionals
+}: {
+  entries: FinancialEntryItem[];
+  patients: PatientListItem[];
+  professionals: ProfessionalListItem[];
+}) {
+  const router = useRouter();
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+
+  const deleteEntry = async (id: string) => {
+    setDeletingEntryId(id);
+
+    const response = await fetch(`/api/financial/entries/${id}`, {
+      method: "DELETE"
+    });
+
+    setDeletingEntryId(null);
+
+    if (!response.ok) {
+      return;
+    }
+
+    router.refresh();
+  };
+
   if (!entries.length) {
     return (
       <Card className="border-white/70 bg-white/92">
@@ -48,6 +84,7 @@ export function FinancialTable({ entries }: { entries: FinancialEntryItem[] }) {
                 <th className="px-6 py-4">Valor</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Vencimento</th>
+                <th className="px-6 py-4 text-right">Acoes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-white">
@@ -66,6 +103,20 @@ export function FinancialTable({ entries }: { entries: FinancialEntryItem[] }) {
                     <Badge variant={statusMap[entry.status].variant}>{statusMap[entry.status].label}</Badge>
                   </td>
                   <td className="px-6 py-4">{formatDate(entry.dueDate)}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-end gap-2">
+                      <FinancialEditTrigger entry={entry} patients={patients} professionals={professionals} />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteEntry(entry.id)}
+                        disabled={deletingEntryId === entry.id}
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        {deletingEntryId === entry.id ? "Excluindo..." : "Excluir"}
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -90,6 +141,17 @@ export function FinancialTable({ entries }: { entries: FinancialEntryItem[] }) {
                 <p><span className="font-medium text-slate-950">Profissional:</span> {entry.professionalName ?? "Sem profissional"}</p>
                 <p><span className="font-medium text-slate-950">Valor:</span> {formatCurrency(entry.amount)}</p>
                 <p><span className="font-medium text-slate-950">Vencimento:</span> {formatDate(entry.dueDate)}</p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <FinancialEditTrigger entry={entry} patients={patients} professionals={professionals} />
+                <Button
+                  variant="outline"
+                  onClick={() => deleteEntry(entry.id)}
+                  disabled={deletingEntryId === entry.id}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  {deletingEntryId === entry.id ? "Excluindo..." : "Excluir"}
+                </Button>
               </div>
             </CardContent>
           </Card>

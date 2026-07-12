@@ -54,7 +54,7 @@ export default async function FinancialPage({
       </Card>
 
       <FinancialSummaryCards summary={summary} />
-      <FinancialTable entries={entries} />
+      <FinancialTable entries={entries} patients={patients} professionals={professionals} />
     </div>
   );
 }

@@ -5,7 +5,8 @@ import type {
   CreateFinancialEntryInput,
   FinancialFiltersInput,
   FinancialEntryItem,
-  FinancialSummary
+  FinancialSummary,
+  UpdateFinancialEntryInput
 } from "@/modules/financial/types/financial";
 
 function isWithinRange(date: string, filters: FinancialFiltersInput) {
@@ -191,4 +192,115 @@ export async function createFinancialEntry(input: CreateFinancialEntryInput): Pr
     date: entry.createdAt.toISOString(),
     dueDate: entry.dueDate?.toISOString() ?? null
   };
+}
+
+export async function updateFinancialEntry(
+  id: string,
+  input: UpdateFinancialEntryInput
+): Promise<FinancialEntryItem | null> {
+  if (!process.env.DATABASE_URL) {
+    const entry = mockFinancialEntries.find((item) => item.id === id);
+
+    if (!entry) {
+      return null;
+    }
+
+    return {
+      ...entry,
+      description: input.description,
+      category: input.category,
+      paymentMethod: input.paymentMethod,
+      amount: input.amount,
+      status: input.status ?? "PENDING",
+      type: input.type,
+      dueDate: input.dueDate ?? null
+    };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const existingEntry = await prisma.financialEntry.findUnique({
+    where: {
+      id
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!existingEntry || existingEntry.tenantId !== tenantId) {
+    return null;
+  }
+
+  const entry = await prisma.financialEntry.update({
+    where: {
+      id
+    },
+    data: {
+      patientId: input.patientId || null,
+      professionalId: input.professionalId || null,
+      description: input.description,
+      type: input.type,
+      status: input.status ?? "PENDING",
+      category: input.category,
+      paymentMethod: input.paymentMethod,
+      amount: input.amount,
+      dueDate: input.dueDate ? new Date(input.dueDate) : null
+    },
+    include: {
+      patient: true,
+      professional: true
+    }
+  });
+
+  return {
+    id: entry.id,
+    description: entry.description,
+    patientName: entry.patient?.fullName ?? null,
+    professionalName: entry.professional?.name ?? null,
+    category: entry.category,
+    paymentMethod: entry.paymentMethod,
+    amount: Number(entry.amount),
+    status: entry.status,
+    type: entry.type,
+    date: entry.createdAt.toISOString(),
+    dueDate: entry.dueDate?.toISOString() ?? null
+  };
+}
+
+export async function deleteFinancialEntry(id: string) {
+  if (!process.env.DATABASE_URL) {
+    return { id };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const existingEntry = await prisma.financialEntry.findUnique({
+    where: {
+      id
+    },
+    select: {
+      tenantId: true
+    }
+  });
+
+  if (!existingEntry || existingEntry.tenantId !== tenantId) {
+    return null;
+  }
+
+  await prisma.financialEntry.delete({
+    where: {
+      id
+    }
+  });
+
+  return { id };
 }

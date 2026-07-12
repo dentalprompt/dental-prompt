@@ -30,6 +30,8 @@ export type CreateFinancialEntryInput = {
   status?: "PENDING" | "PAID" | "OVERDUE" | "CANCELED" | "SCHEDULED";
 };
 
+export type UpdateFinancialEntryInput = CreateFinancialEntryInput;
+
 export type FinancialFiltersInput = {
   type?: "INCOME" | "EXPENSE";
   status?: "PENDING" | "PAID" | "OVERDUE" | "CANCELED" | "SCHEDULED";

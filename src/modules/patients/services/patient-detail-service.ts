@@ -43,6 +43,41 @@ export async function getPatientDetail(id: string): Promise<PatientDetail | null
     where: { id },
     include: {
       plan: true,
+      budgets: {
+        include: {
+          professional: true,
+          plan: true
+        },
+        orderBy: {
+          date: "desc"
+        }
+      },
+      treatments: {
+        include: {
+          professional: true,
+          evolutions: {
+            include: {
+              professional: true
+            },
+            orderBy: {
+              createdAt: "desc"
+            }
+          }
+        },
+        orderBy: {
+          updatedAt: "desc"
+        }
+      },
+      anamneses: {
+        orderBy: {
+          createdAt: "desc"
+        }
+      },
+      files: {
+        orderBy: {
+          createdAt: "desc"
+        }
+      },
       appointments: {
         include: {
           professional: true
@@ -66,6 +101,14 @@ export async function getPatientDetail(id: string): Promise<PatientDetail | null
   const previousAppointments = patient.appointments.filter((item) => item.startsAt < new Date());
   const nextAppointments = patient.appointments.filter((item) => item.startsAt >= new Date());
   const latestProfessional = nextAppointments[0]?.professional?.name ?? previousAppointments.at(-1)?.professional?.name ?? null;
+  const evolutions = patient.treatments.flatMap((treatment) =>
+    treatment.evolutions.map((evolution) => ({
+      id: evolution.id,
+      professional: evolution.professional?.name ?? treatment.professional?.name ?? "Nao informado",
+      description: evolution.description,
+      createdAt: evolution.createdAt.toISOString()
+    }))
+  );
 
   return {
     id: patient.id,
@@ -82,12 +125,45 @@ export async function getPatientDetail(id: string): Promise<PatientDetail | null
     lastAppointment: previousAppointments.at(-1)?.startsAt.toISOString() ?? null,
     nextAppointment: nextAppointments[0]?.startsAt.toISOString() ?? null,
     notes: patient.notes,
-    budgets: [],
-    treatments: [],
-    evolutions: [],
-    anamnesisSummary: ["Estrutura pronta para modelos dinamicos por clinica."],
-    images: [],
-    documents: [],
+    budgets: patient.budgets.map((budget) => ({
+      id: budget.id,
+      number: budget.number,
+      date: budget.date.toISOString(),
+      professional: budget.professional?.name ?? "Nao informado",
+      plan: budget.plan?.name ?? "Nao informado",
+      value: Number(budget.value),
+      finalValue: Number(budget.finalValue),
+      status: budget.status
+    })),
+    treatments: patient.treatments.map((treatment) => ({
+      id: treatment.id,
+      procedure: treatment.procedure,
+      tooth: treatment.tooth ?? "Nao informado",
+      face: treatment.face ?? "Nao informada",
+      professional: treatment.professional?.name ?? "Nao informado",
+      status: treatment.status,
+      updatedAt: treatment.updatedAt.toISOString()
+    })),
+    evolutions,
+    anamnesisSummary: patient.anamneses.length
+      ? patient.anamneses.map((item) => item.summary)
+      : ["Anamnese ainda nao registrada."],
+    images: patient.files
+      .filter((item) => item.category === "IMAGE")
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        createdAt: item.createdAt.toISOString()
+      })),
+    documents: patient.files
+      .filter((item) => item.category === "DOCUMENT")
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        createdAt: item.createdAt.toISOString()
+      })),
     debts: patient.financialItems.map((item) => ({
       id: item.id,
       description: item.description,

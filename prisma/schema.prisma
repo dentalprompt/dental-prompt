@@ -96,6 +96,28 @@ enum AgentStatus {
   DRAFT
 }
 
+enum BudgetStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  CANCELED
+  FINISHED
+}
+
+enum TreatmentStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+  WAITING
+}
+
+enum PatientFileCategory {
+  IMAGE
+  DOCUMENT
+}
+
 model Tenant {
   id             String              @id @default(cuid())
   name           String
@@ -121,6 +143,10 @@ model Tenant {
   contracts      ContractTemplate[]
   accounts       FinancialAccount[]
   chairs         Chair[]
+  patientBudgets PatientBudget[]
+  patientTreatments PatientTreatment[]
+  patientAnamneses PatientAnamnesis[]
+  patientFiles   PatientFile[]
   auditLogs      AuditLog[]
 }
 
@@ -239,6 +265,10 @@ model Patient {
   appointments    Appointment[]
   conversations   Conversation[]
   financialItems  FinancialEntry[]
+  budgets         PatientBudget[]
+  treatments      PatientTreatment[]
+  anamneses       PatientAnamnesis[]
+  files           PatientFile[]
 
   @@index([tenantId, fullName])
   @@index([tenantId, cpf])
@@ -258,6 +288,9 @@ model Professional {
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   appointments  Appointment[]
   financialItems FinancialEntry[]
+  budgets        PatientBudget[]
+  treatments     PatientTreatment[]
+  evolutions     TreatmentEvolution[]
 }
 
 model Plan {
@@ -273,6 +306,7 @@ model Plan {
   tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   patients       Patient[]
   procedures     PlanProcedure[]
+  budgets        PatientBudget[]
 }
 
 model PlanProcedure {
@@ -430,6 +464,78 @@ model ClinicSettings {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model PatientBudget {
+  id             String       @id @default(cuid())
+  tenantId       String
+  patientId      String
+  professionalId String?
+  planId         String?
+  number         String
+  date           DateTime
+  value          Decimal      @db.Decimal(10, 2)
+  finalValue     Decimal      @db.Decimal(10, 2)
+  status         BudgetStatus @default(DRAFT)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient        Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional   Professional? @relation(fields: [professionalId], references: [id])
+  plan           Plan?        @relation(fields: [planId], references: [id])
+}
+
+model PatientTreatment {
+  id             String            @id @default(cuid())
+  tenantId       String
+  patientId      String
+  professionalId String?
+  procedure      String
+  tooth          String?
+  face           String?
+  status         TreatmentStatus   @default(PLANNED)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional   Professional?     @relation(fields: [professionalId], references: [id])
+  evolutions     TreatmentEvolution[]
+}
+
+model TreatmentEvolution {
+  id             String            @id @default(cuid())
+  treatmentId    String
+  professionalId String?
+  description    String
+  createdAt      DateTime          @default(now())
+  treatment      PatientTreatment  @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  professional   Professional?     @relation(fields: [professionalId], references: [id])
+}
+
+model PatientAnamnesis {
+  id          String   @id @default(cuid())
+  tenantId    String
+  patientId   String
+  templateId  String?
+  summary     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model PatientFile {
+  id          String              @id @default(cuid())
+  tenantId    String
+  patientId   String
+  name        String
+  type        String
+  category    PatientFileCategory
+  url         String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient     Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model AnamnesisTemplate {

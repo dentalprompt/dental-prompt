@@ -725,6 +725,171 @@ async function main() {
       )
   );
 
+  await Promise.all(
+    [
+      patientOne && {
+        id: "budget_demo_1",
+        patientId: patientOne.id,
+        professionalId: professionals[0].id,
+        planId: plan.id,
+        number: "ORC-00018",
+        date: new Date("2026-07-01T10:00:00.000Z"),
+        value: 2200,
+        finalValue: 1980,
+        status: "APPROVED" as const
+      },
+      patientThree && {
+        id: "budget_demo_2",
+        patientId: patientThree.id,
+        professionalId: professionals[2].id,
+        planId: plan.id,
+        number: "ORC-00019",
+        date: new Date("2026-07-03T14:00:00.000Z"),
+        value: 9500,
+        finalValue: 9100,
+        status: "SENT" as const
+      }
+    ]
+      .filter(isPresent)
+      .map((budget) =>
+        prisma.patientBudget.upsert({
+          where: { id: budget.id },
+          update: {},
+          create: {
+            ...budget,
+            tenantId: tenant.id
+          }
+        })
+      )
+  );
+
+  const treatments = await Promise.all(
+    [
+      patientOne && {
+        id: "treatment_demo_1",
+        patientId: patientOne.id,
+        professionalId: professionals[0].id,
+        procedure: "Clareamento supervisionado",
+        tooth: "11-21",
+        face: "Vestibular",
+        status: "IN_PROGRESS" as const
+      },
+      patientThree && {
+        id: "treatment_demo_2",
+        patientId: patientThree.id,
+        professionalId: professionals[2].id,
+        procedure: "Implante unitario",
+        tooth: "36",
+        face: "Oclusal",
+        status: "PLANNED" as const
+      }
+    ]
+      .filter(isPresent)
+      .map((treatment) =>
+        prisma.patientTreatment.upsert({
+          where: { id: treatment.id },
+          update: {},
+          create: {
+            ...treatment,
+            tenantId: tenant.id
+          }
+        })
+      )
+  );
+
+  await Promise.all(
+    [
+      {
+        id: "evolution_demo_1",
+        treatmentId: treatments[0]?.id,
+        professionalId: professionals[0].id,
+        description: "Paciente apresentou boa adaptacao ao protocolo inicial."
+      },
+      {
+        id: "evolution_demo_2",
+        treatmentId: treatments[1]?.id,
+        professionalId: professionals[2].id,
+        description: "Exames avaliados e planejamento cirurgico encaminhado."
+      }
+    ]
+      .filter((item) => item.treatmentId)
+      .map((evolution) =>
+        prisma.treatmentEvolution.upsert({
+          where: { id: evolution.id },
+          update: {},
+          create: {
+            id: evolution.id,
+            treatmentId: evolution.treatmentId!,
+            professionalId: evolution.professionalId,
+            description: evolution.description
+          }
+        })
+      )
+  );
+
+  await Promise.all(
+    [
+      patientOne && {
+        id: "patient_anamnesis_demo_1",
+        patientId: patientOne.id,
+        summary: "Paciente relata sensibilidade moderada e sem alergias medicamentosas."
+      },
+      patientThree && {
+        id: "patient_anamnesis_demo_2",
+        patientId: patientThree.id,
+        summary: "Paciente apta para implantodontia, aguardando exames complementares."
+      }
+    ]
+      .filter(isPresent)
+      .map((anamnesis) =>
+        prisma.patientAnamnesis.upsert({
+          where: { id: anamnesis.id },
+          update: {},
+          create: {
+            ...anamnesis,
+            tenantId: tenant.id
+          }
+        })
+      )
+  );
+
+  await Promise.all(
+    [
+      patientOne && {
+        id: "patient_file_demo_1",
+        patientId: patientOne.id,
+        name: "Foto inicial sorriso",
+        type: "jpg",
+        category: "IMAGE" as const
+      },
+      patientOne && {
+        id: "patient_file_demo_2",
+        patientId: patientOne.id,
+        name: "Contrato clareamento",
+        type: "pdf",
+        category: "DOCUMENT" as const
+      },
+      patientThree && {
+        id: "patient_file_demo_3",
+        patientId: patientThree.id,
+        name: "Tomografia implantodontia",
+        type: "png",
+        category: "IMAGE" as const
+      }
+    ]
+      .filter(isPresent)
+      .map((file) =>
+        prisma.patientFile.upsert({
+          where: { id: file.id },
+          update: {},
+          create: {
+            ...file,
+            tenantId: tenant.id
+          }
+        })
+      )
+  );
+
   const serviceBoard = await prisma.serviceBoard.upsert({
     where: { id: "service_board_demo_1" },
     update: {

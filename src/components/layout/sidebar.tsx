@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { DentalPromptLogo } from "@/components/brand/dental-prompt-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -62,17 +63,18 @@ export function Sidebar({
       </Button>
 
       <div className="flex justify-center border-b border-white/60 py-2">
-        <Image
-          src="/brand/dental-prompt-sidebar-logo.png"
-          alt="Dental Prompt"
-          width={1013}
-          height={158}
-          priority
-          className={cn(
-            "h-auto object-contain transition-all duration-300",
-            collapsed ? "w-14" : "w-[230px]"
-          )}
-        />
+        {collapsed ? (
+          <DentalPromptLogo compact showTagline={false} className="justify-center" />
+        ) : (
+          <Image
+            src="/brand/dental-prompt-sidebar-logo.png"
+            alt="Dental Prompt"
+            width={1013}
+            height={158}
+            priority
+            className="h-auto w-[230px] object-contain transition-all duration-300"
+          />
+        )}
       </div>
       <nav className="mt-6 flex flex-1 flex-col gap-2">
         {items.map((item) => {

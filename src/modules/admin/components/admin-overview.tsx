@@ -4,6 +4,7 @@ import { Building2, ShieldCheck, UserCog, Waypoints } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminBackupPanel } from "@/modules/admin/components/admin-backup-panel";
 import { getAdminOverview } from "@/modules/admin/services/admin-overview-service";
 
 function formatDateTime(value: string) {
@@ -182,6 +183,10 @@ export async function AdminOverview() {
             ))}
           </CardContent>
         </Card>
+      </section>
+
+      <section>
+        <AdminBackupPanel />
       </section>
     </div>
   );

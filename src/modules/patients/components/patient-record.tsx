@@ -1,17 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FileText, Filter, ImageIcon, MessageCircle, PencilLine, ShieldAlert, Stethoscope, Wallet } from "lucide-react";
+import { Download, FileText, Filter, ImageIcon, LoaderCircle, MessageCircle, PencilLine, Plus, ShieldAlert, Stethoscope, Upload, Wallet } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/utils";
 import type { PatientDetail } from "@/modules/patients/types/patient-detail";
+
+type DynamicTemplateField = {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "date" | "checkbox" | "radio" | "select" | "multi_select";
+  options: string[];
+  required: boolean;
+};
+
+type TemplateOption = {
+  id: string;
+  name: string;
+  description: string;
+  specialty?: string;
+  category?: string;
+  content?: string;
+  isActive: boolean;
+};
+
+type LocalFile = {
+  id: string;
+  name: string;
+  type: string;
+  createdAt: string;
+  url?: string | null;
+};
 
 function formatDateTime(value: string | null) {
   if (!value) return "Nao informado";
@@ -80,6 +117,40 @@ function buildToothRegistry(patient: PatientDetail) {
     .filter((tooth) => /^\d{2}$/.test(tooth));
 
   return new Set([...treatmentTeeth, ...budgetTeeth]);
+}
+
+function normalizeSummary(summary: string) {
+  return summary
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const base64 = result.includes(",") ? result.split(",")[1] ?? "" : result;
+      resolve(base64);
+    };
+
+    reader.onerror = () => reject(new Error("Nao foi possivel ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderFieldValue(value: string | string[] | boolean) {
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Sim" : "Nao";
+  }
+
+  return value;
 }
 
 function ToothButton({
@@ -177,6 +248,29 @@ function OdontogramCard({
 
 export function PatientRecord({ patient }: { patient: PatientDetail }) {
   const [selectedTooth, setSelectedTooth] = useState("all");
+  const [images, setImages] = useState<LocalFile[]>(patient.images);
+  const [documents, setDocuments] = useState<LocalFile[]>(patient.documents);
+  const [anamnesisSummary, setAnamnesisSummary] = useState(patient.anamnesisSummary);
+  const [anamnesisTemplates, setAnamnesisTemplates] = useState<TemplateOption[]>([]);
+  const [contractTemplates, setContractTemplates] = useState<TemplateOption[]>([]);
+  const [anamnesisFields, setAnamnesisFields] = useState<DynamicTemplateField[]>([]);
+  const [anamnesisAnswers, setAnamnesisAnswers] = useState<Record<string, string | string[] | boolean>>({});
+  const [selectedAnamnesisTemplate, setSelectedAnamnesisTemplate] = useState("");
+  const [selectedContractTemplate, setSelectedContractTemplate] = useState("");
+  const [selectedBudgetId, setSelectedBudgetId] = useState(patient.budgets[0]?.id ?? "");
+  const [contractPreview, setContractPreview] = useState("");
+  const [uploadCategory, setUploadCategory] = useState<"IMAGE" | "DOCUMENT">("DOCUMENT");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [anamnesisDialogOpen, setAnamnesisDialogOpen] = useState(false);
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [anamnesisLoading, setAnamnesisLoading] = useState(false);
+  const [uploadSubmitting, setUploadSubmitting] = useState(false);
+  const [anamnesisSubmitting, setAnamnesisSubmitting] = useState(false);
+  const [contractLoading, setContractLoading] = useState(false);
+  const [inlineMessage, setInlineMessage] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   const activeTeeth = useMemo(() => buildToothRegistry(patient), [patient]);
   const filteredBudgets = useMemo(
@@ -192,6 +286,268 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
   );
   const overdueDebts = patient.debts.filter((debt) => debt.status === "OVERDUE").length;
   const totalBudgeted = patient.budgets.reduce((sum, budget) => sum + budget.finalValue, 0);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadTemplates() {
+      setTemplatesLoading(true);
+
+      try {
+        const [anamnesisResponse, contractResponse] = await Promise.all([
+          fetch("/api/settings/anamneses", { cache: "no-store" }),
+          fetch("/api/settings/contracts", { cache: "no-store" })
+        ]);
+
+        const anamnesisPayload = (await anamnesisResponse.json()) as { data?: TemplateOption[] };
+        const contractPayload = (await contractResponse.json()) as { data?: TemplateOption[] };
+
+        if (!active) {
+          return;
+        }
+
+        const activeAnamnesisTemplates = (anamnesisPayload.data ?? []).filter((item) => item.isActive);
+        const activeContractTemplates = (contractPayload.data ?? []).filter((item) => item.isActive);
+
+        setAnamnesisTemplates(activeAnamnesisTemplates);
+        setContractTemplates(activeContractTemplates);
+        setSelectedAnamnesisTemplate((current) => current || activeAnamnesisTemplates[0]?.id || "");
+        setSelectedContractTemplate((current) => current || activeContractTemplates[0]?.id || "");
+      } catch {
+        if (active) {
+          setInlineError("Nao foi possivel carregar modelos dinâmicos.");
+        }
+      } finally {
+        if (active) {
+          setTemplatesLoading(false);
+        }
+      }
+    }
+
+    void loadTemplates();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAnamnesisFields() {
+      if (!selectedAnamnesisTemplate) {
+        setAnamnesisFields([]);
+        setAnamnesisAnswers({});
+        return;
+      }
+
+      setAnamnesisLoading(true);
+
+      try {
+        const response = await fetch(`/api/settings/anamneses/${selectedAnamnesisTemplate}/fields`, {
+          cache: "no-store"
+        });
+
+        const payload = (await response.json()) as { data?: DynamicTemplateField[]; message?: string };
+
+        if (!response.ok) {
+          throw new Error(payload.message || "Nao foi possivel carregar os campos.");
+        }
+
+        if (!active) {
+          return;
+        }
+
+        const fields = payload.data ?? [];
+        setAnamnesisFields(fields);
+        setAnamnesisAnswers(
+          Object.fromEntries(
+            fields.map((field) => [
+              field.key,
+              field.type === "checkbox" ? false : field.type === "multi_select" ? [] : ""
+            ])
+          )
+        );
+      } catch (error) {
+        if (active) {
+          setInlineError(error instanceof Error ? error.message : "Falha ao carregar a anamnese.");
+        }
+      } finally {
+        if (active) {
+          setAnamnesisLoading(false);
+        }
+      }
+    }
+
+    void loadAnamnesisFields();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedAnamnesisTemplate]);
+
+  async function handleUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!uploadFile) {
+      setInlineError("Selecione um arquivo para continuar.");
+      return;
+    }
+
+    setUploadSubmitting(true);
+    setInlineError(null);
+    setInlineMessage(null);
+
+    try {
+      const base64Content = await fileToBase64(uploadFile);
+      const response = await fetch(`/api/patients/${patient.id}/files`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: uploadFile.name,
+          type: uploadFile.type || "application/octet-stream",
+          category: uploadCategory,
+          base64Content
+        })
+      });
+
+      const payload = (await response.json()) as { data?: LocalFile; message?: string };
+
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.message || "Nao foi possivel enviar o arquivo.");
+      }
+
+      if (uploadCategory === "IMAGE") {
+        setImages((current) => [payload.data!, ...current]);
+      } else {
+        setDocuments((current) => [payload.data!, ...current]);
+      }
+
+      setUploadFile(null);
+      setUploadDialogOpen(false);
+      setInlineMessage("Arquivo enviado com sucesso.");
+    } catch (error) {
+      setInlineError(error instanceof Error ? error.message : "Falha ao enviar o arquivo.");
+    } finally {
+      setUploadSubmitting(false);
+    }
+  }
+
+  async function handleAnamnesisSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedAnamnesisTemplate) {
+      setInlineError("Selecione um modelo de anamnese.");
+      return;
+    }
+
+    setAnamnesisSubmitting(true);
+    setInlineError(null);
+    setInlineMessage(null);
+
+    try {
+      const response = await fetch(`/api/patients/${patient.id}/anamneses`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          templateId: selectedAnamnesisTemplate,
+          answers: anamnesisAnswers
+        })
+      });
+
+      const payload = (await response.json()) as { data?: { summary?: string }; message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Nao foi possivel salvar a anamnese.");
+      }
+
+      const summary = payload.data?.summary ? normalizeSummary(payload.data.summary) : [];
+      if (summary.length) {
+        setAnamnesisSummary(summary);
+      }
+
+      setAnamnesisDialogOpen(false);
+      setInlineMessage("Anamnese registrada com sucesso.");
+    } catch (error) {
+      setInlineError(error instanceof Error ? error.message : "Falha ao salvar a anamnese.");
+    } finally {
+      setAnamnesisSubmitting(false);
+    }
+  }
+
+  async function handleContractPreview(downloadPdf = false) {
+    if (!selectedContractTemplate) {
+      setInlineError("Selecione um modelo de contrato.");
+      return;
+    }
+
+    setContractLoading(true);
+    setInlineError(null);
+    setInlineMessage(null);
+
+    try {
+      const query = new URLSearchParams({
+        patientId: patient.id
+      });
+
+      if (selectedBudgetId) {
+        query.set("budgetId", selectedBudgetId);
+      }
+
+      if (downloadPdf) {
+        query.set("format", "pdf");
+      }
+
+      const response = await fetch(
+        `/api/settings/contracts/${selectedContractTemplate}/render?${query.toString()}`,
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message || "Nao foi possivel gerar o contrato.");
+      }
+
+      if (downloadPdf) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener,noreferrer");
+        setInlineMessage("Contrato em PDF gerado com sucesso.");
+        return;
+      }
+
+      const payload = (await response.json()) as { data?: { rendered?: string } };
+      setContractPreview(payload.data?.rendered ?? "");
+    } catch (error) {
+      setInlineError(error instanceof Error ? error.message : "Falha ao gerar o contrato.");
+    } finally {
+      setContractLoading(false);
+    }
+  }
+
+  function updateFieldAnswer(field: DynamicTemplateField, rawValue: string | boolean) {
+    setAnamnesisAnswers((current) => {
+      if (field.type === "multi_select" && typeof rawValue === "string") {
+        const currentValues = Array.isArray(current[field.key]) ? (current[field.key] as string[]) : [];
+
+        return {
+          ...current,
+          [field.key]: currentValues.includes(rawValue)
+            ? currentValues.filter((value) => value !== rawValue)
+            : [...currentValues, rawValue]
+        };
+      }
+
+      return {
+        ...current,
+        [field.key]: rawValue
+      };
+    });
+  }
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -216,6 +572,18 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
               <MessageCircle className="mr-2 size-4" />
               WhatsApp
             </Button>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+              <Upload className="mr-2 size-4" />
+              Enviar arquivo
+            </Button>
+            <Button variant="outline" onClick={() => setAnamnesisDialogOpen(true)}>
+              <Plus className="mr-2 size-4" />
+              Nova anamnese
+            </Button>
+            <Button onClick={() => setContractDialogOpen(true)}>
+              <FileText className="mr-2 size-4" />
+              Gerar contrato
+            </Button>
             <Button variant="outline">
               <PencilLine className="mr-2 size-4" />
               Editar cadastro
@@ -223,6 +591,18 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
           </div>
         </CardContent>
       </Card>
+
+      {inlineMessage ? (
+        <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm text-emerald-700">
+          {inlineMessage}
+        </div>
+      ) : null}
+
+      {inlineError ? (
+        <div className="rounded-[1.25rem] border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm text-rose-700">
+          {inlineError}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
@@ -445,11 +825,19 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
         <TabsContent value="anamnese">
           <Card className="border-white/70 bg-white/92">
             <CardHeader>
-              <CardTitle>Anamnese</CardTitle>
-              <CardDescription>Preparada para modelos dinamicos por especialidade e versionamento completo.</CardDescription>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <CardTitle>Anamnese</CardTitle>
+                  <CardDescription>Preparada para modelos dinamicos por especialidade e versionamento completo.</CardDescription>
+                </div>
+                <Button variant="outline" onClick={() => setAnamnesisDialogOpen(true)}>
+                  <Plus className="mr-2 size-4" />
+                  Registrar anamnese
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {patient.anamnesisSummary.map((item) => (
+              {anamnesisSummary.map((item) => (
                 <div key={item} className="rounded-[1.25rem] border border-border bg-background p-4 text-sm text-slate-600">
                   {item}
                 </div>
@@ -461,12 +849,26 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
         <TabsContent value="imagens">
           <Card className="border-white/70 bg-white/92">
             <CardHeader>
-              <CardTitle>Imagens</CardTitle>
-              <CardDescription>Fotos e radiografias vinculadas ao paciente com preparo para storage provider.</CardDescription>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <CardTitle>Imagens</CardTitle>
+                  <CardDescription>Fotos e radiografias vinculadas ao paciente com preparo para storage provider.</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setUploadCategory("IMAGE");
+                    setUploadDialogOpen(true);
+                  }}
+                >
+                  <Upload className="mr-2 size-4" />
+                  Nova imagem
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              {patient.images.length ? (
-                patient.images.map((item) => (
+              {images.length ? (
+                images.map((item) => (
                   <div key={item.id} className="rounded-[1.25rem] border border-border bg-background p-5">
                     <div className="flex items-center gap-3">
                       <span className="rounded-2xl bg-accent p-3 text-primary">
@@ -477,6 +879,16 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
                         <p className="text-sm text-slate-500">{item.type} • {formatDateOnly(item.createdAt)}</p>
                       </div>
                     </div>
+                    {item.url ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-flex text-sm font-medium text-primary"
+                      >
+                        Visualizar arquivo
+                      </a>
+                    ) : null}
                   </div>
                 ))
               ) : (
@@ -489,12 +901,32 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
         <TabsContent value="documentos">
           <Card className="border-white/70 bg-white/92">
             <CardHeader>
-              <CardTitle>Documentos</CardTitle>
-              <CardDescription>Arquivos e contratos com arquitetura pronta para PDF, DOCX e exportacoes futuras.</CardDescription>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <CardTitle>Documentos</CardTitle>
+                  <CardDescription>Arquivos e contratos com arquitetura pronta para PDF, DOCX e exportacoes futuras.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setUploadCategory("DOCUMENT");
+                      setUploadDialogOpen(true);
+                    }}
+                  >
+                    <Upload className="mr-2 size-4" />
+                    Novo documento
+                  </Button>
+                  <Button onClick={() => setContractDialogOpen(true)}>
+                    <FileText className="mr-2 size-4" />
+                    Novo contrato
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="grid gap-4">
-              {patient.documents.length ? (
-                patient.documents.map((item) => (
+              {documents.length ? (
+                documents.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 rounded-[1.25rem] border border-border bg-background p-5">
                     <span className="rounded-2xl bg-accent p-3 text-primary">
                       <FileText className="size-5" />
@@ -503,6 +935,16 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
                       <p className="font-semibold text-slate-950">{item.name}</p>
                       <p className="text-sm text-slate-500">{item.type} • {formatDateOnly(item.createdAt)}</p>
                     </div>
+                    {item.url ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-auto inline-flex text-sm font-medium text-primary"
+                      >
+                        Abrir
+                      </a>
+                    ) : null}
                   </div>
                 ))
               ) : (
@@ -546,6 +988,279 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar arquivo do paciente</DialogTitle>
+            <DialogDescription>
+              Adicione imagens, exames, contratos ou documentos sem sair da ficha.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={handleUploadSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="upload-category">Categoria</Label>
+              <select
+                id="upload-category"
+                value={uploadCategory}
+                onChange={(event) => setUploadCategory(event.target.value as "IMAGE" | "DOCUMENT")}
+                className="flex h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary"
+              >
+                <option value="DOCUMENT">Documento</option>
+                <option value="IMAGE">Imagem</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="upload-file">Arquivo</Label>
+              <Input
+                id="upload-file"
+                type="file"
+                accept={uploadCategory === "IMAGE" ? "image/*" : undefined}
+                onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={uploadSubmitting}>
+                {uploadSubmitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Upload className="mr-2 size-4" />}
+                Enviar arquivo
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={anamnesisDialogOpen} onOpenChange={setAnamnesisDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nova anamnese</DialogTitle>
+            <DialogDescription>
+              Preencha um modelo dinâmico e registre o resumo diretamente no prontuário.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={handleAnamnesisSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="anamnesis-template">Modelo</Label>
+              <select
+                id="anamnesis-template"
+                value={selectedAnamnesisTemplate}
+                onChange={(event) => setSelectedAnamnesisTemplate(event.target.value)}
+                className="flex h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary"
+              >
+                <option value="">{templatesLoading ? "Carregando modelos..." : "Selecione um modelo"}</option>
+                {anamnesisTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}{template.specialty ? ` • ${template.specialty}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {anamnesisLoading ? (
+              <div className="rounded-[1.25rem] border border-dashed border-border bg-background p-4 text-sm text-slate-500">
+                Carregando campos do modelo...
+              </div>
+            ) : anamnesisFields.length ? (
+              <div className="space-y-4">
+                {anamnesisFields.map((field) => (
+                  <div key={field.key} className="space-y-2">
+                    <Label htmlFor={field.key}>
+                      {field.label}
+                      {field.required ? " *" : ""}
+                    </Label>
+
+                    {field.type === "textarea" ? (
+                      <Textarea
+                        id={field.key}
+                        required={field.required}
+                        value={String(anamnesisAnswers[field.key] ?? "")}
+                        onChange={(event) => updateFieldAnswer(field, event.target.value)}
+                      />
+                    ) : field.type === "select" ? (
+                      <select
+                        id={field.key}
+                        required={field.required}
+                        value={String(anamnesisAnswers[field.key] ?? "")}
+                        onChange={(event) => updateFieldAnswer(field, event.target.value)}
+                        className="flex h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary"
+                      >
+                        <option value="">Selecione</option>
+                        {field.options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ) : field.type === "radio" ? (
+                      <div className="flex flex-wrap gap-2">
+                        {field.options.map((option) => (
+                          <label
+                            key={option}
+                            className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-sm"
+                          >
+                            <input
+                              type="radio"
+                              name={field.key}
+                              value={option}
+                              checked={anamnesisAnswers[field.key] === option}
+                              onChange={(event) => updateFieldAnswer(field, event.target.value)}
+                            />
+                            {option}
+                          </label>
+                        ))}
+                      </div>
+                    ) : field.type === "checkbox" ? (
+                      <label className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(anamnesisAnswers[field.key])}
+                          onChange={(event) => updateFieldAnswer(field, event.target.checked)}
+                        />
+                        Marcar como sim
+                      </label>
+                    ) : field.type === "multi_select" ? (
+                      <div className="flex flex-wrap gap-2">
+                        {field.options.map((option) => {
+                          const selectedValues = Array.isArray(anamnesisAnswers[field.key])
+                            ? (anamnesisAnswers[field.key] as string[])
+                            : [];
+                          const checked = selectedValues.includes(option);
+
+                          return (
+                            <label
+                              key={option}
+                              className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => updateFieldAnswer(field, option)}
+                              />
+                              {option}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <Input
+                        id={field.key}
+                        type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+                        required={field.required}
+                        value={String(anamnesisAnswers[field.key] ?? "")}
+                        onChange={(event) => updateFieldAnswer(field, event.target.value)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-[1.25rem] border border-dashed border-border bg-background p-4 text-sm text-slate-500">
+                Este modelo ainda nao possui campos estruturados.
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setAnamnesisDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={anamnesisSubmitting || !anamnesisFields.length}>
+                {anamnesisSubmitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
+                Salvar anamnese
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contractDialogOpen} onOpenChange={setContractDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Gerar contrato</DialogTitle>
+            <DialogDescription>
+              Monte o contrato com variáveis do paciente e do orçamento, depois visualize ou exporte em PDF.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="contract-template">Modelo de contrato</Label>
+                <select
+                  id="contract-template"
+                  value={selectedContractTemplate}
+                  onChange={(event) => setSelectedContractTemplate(event.target.value)}
+                  className="flex h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary"
+                >
+                  <option value="">{templatesLoading ? "Carregando modelos..." : "Selecione um contrato"}</option>
+                  {contractTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}{template.category ? ` • ${template.category}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contract-budget">Orcamento vinculado</Label>
+                <select
+                  id="contract-budget"
+                  value={selectedBudgetId}
+                  onChange={(event) => setSelectedBudgetId(event.target.value)}
+                  className="flex h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition focus:border-primary"
+                >
+                  <option value="">Sem orcamento especifico</option>
+                  {patient.budgets.map((budget) => (
+                    <option key={budget.id} value={budget.id}>
+                      {budget.number} • {formatCurrency(budget.finalValue)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => void handleContractPreview(false)} disabled={contractLoading}>
+                {contractLoading ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <FileText className="mr-2 size-4" />}
+                Visualizar contrato
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void handleContractPreview(true)} disabled={contractLoading}>
+                <Download className="mr-2 size-4" />
+                Exportar PDF
+              </Button>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-border bg-background p-5">
+              <p className="mb-3 text-sm font-medium text-slate-950">Previa do contrato</p>
+              {contractPreview ? (
+                <div className="space-y-3 text-sm leading-7 text-slate-600">
+                  {contractPreview.split("\n").map((line, index) => (
+                    <p key={`${line}-${index}`}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Gere a previa para visualizar o contrato preenchido com os dados do paciente.
+                </p>
+              )}
+            </div>
+
+            {anamnesisFields.length ? (
+              <div className="rounded-[1.5rem] border border-dashed border-border bg-white/70 p-4">
+                <p className="text-sm font-medium text-slate-950">Resumo da ultima anamnese preparada</p>
+                <p className="mt-2 text-sm text-slate-500">
+                  {anamnesisFields.map((field) => `${field.label}: ${renderFieldValue(anamnesisAnswers[field.key] ?? "")}`).join(" • ")}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

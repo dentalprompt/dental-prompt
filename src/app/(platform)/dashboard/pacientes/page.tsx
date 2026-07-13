@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PatientCreateDialog } from "@/modules/patients/components/patient-create-dialog";
+import { PatientImportDialog } from "@/modules/patients/components/patient-import-dialog";
 import { PatientSearch } from "@/modules/patients/components/patient-search";
 import { PatientTable } from "@/modules/patients/components/patient-table";
 import { listPatients } from "@/modules/patients/services/patient-service";
@@ -28,7 +29,10 @@ export default async function PatientsPage({
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button variant="outline">Exportar</Button>
+            <Button asChild variant="outline">
+              <a href="/api/exports/patients?format=xlsx">Exportar</a>
+            </Button>
+            <PatientImportDialog />
             <PatientCreateDialog />
           </div>
         </CardHeader>

@@ -12,7 +12,8 @@ const envSchema = z.object({
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
   EVOLUTION_API_URL: z.string().url().optional(),
   EVOLUTION_API_KEY: z.string().min(1).optional(),
-  EVOLUTION_INSTANCE: z.string().min(1).optional()
+  EVOLUTION_INSTANCE: z.string().min(1).optional(),
+  EVOLUTION_WEBHOOK_SECRET: z.string().min(1).optional()
 });
 
 export const env = envSchema.parse({
@@ -27,5 +28,6 @@ export const env = envSchema.parse({
   GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
   EVOLUTION_API_URL: process.env.EVOLUTION_API_URL,
   EVOLUTION_API_KEY: process.env.EVOLUTION_API_KEY,
-  EVOLUTION_INSTANCE: process.env.EVOLUTION_INSTANCE
+  EVOLUTION_INSTANCE: process.env.EVOLUTION_INSTANCE,
+  EVOLUTION_WEBHOOK_SECRET: process.env.EVOLUTION_WEBHOOK_SECRET
 });

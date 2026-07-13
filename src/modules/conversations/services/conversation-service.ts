@@ -11,6 +11,16 @@ import type {
   SendMessageInput
 } from "@/modules/conversations/types/conversation";
 
+type InboundConversationMessageInput = {
+  tenantId: string;
+  externalId?: string | null;
+  contactName?: string | null;
+  contactPhone: string;
+  content?: string | null;
+  mediaUrl?: string | null;
+  sentAt?: Date | null;
+};
+
 function matchesSearch(conversation: ConversationListItem, search?: string) {
   if (!search) {
     return true;
@@ -227,6 +237,99 @@ function scopedPhoneNumber(phone?: string | null) {
   }
 
   return phone.replace(/\D/g, "");
+}
+
+export async function ingestInboundConversationMessage(
+  input: InboundConversationMessageInput
+): Promise<ConversationMessage | null> {
+  if (!process.env.DATABASE_URL) {
+    return null;
+  }
+
+  const contactPhone = scopedPhoneNumber(input.contactPhone);
+
+  if (!contactPhone) {
+    return null;
+  }
+
+  if (input.externalId) {
+    const existing = await prisma.message.findUnique({
+      where: { externalId: input.externalId }
+    });
+
+    if (existing) {
+      return {
+        id: existing.id,
+        direction: existing.direction,
+        status: existing.status,
+        content: existing.content,
+        mediaUrl: existing.mediaUrl,
+        createdAt: existing.createdAt.toISOString()
+      };
+    }
+  }
+
+  const patient = await prisma.patient.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      OR: [{ mobilePhone: contactPhone }, { whatsappPhone: contactPhone }]
+    },
+    select: {
+      id: true,
+      fullName: true
+    }
+  });
+
+  const conversation =
+    (await prisma.conversation.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        contactPhone
+      }
+    })) ||
+    (await prisma.conversation.create({
+      data: {
+        tenantId: input.tenantId,
+        patientId: patient?.id ?? null,
+        contactName: input.contactName?.trim() || patient?.fullName || contactPhone,
+        contactPhone,
+        isAiEnabled: false
+      }
+    }));
+
+  const message = await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      externalId: input.externalId || null,
+      direction: "INBOUND",
+      status: "DELIVERED",
+      content: input.content?.trim() || null,
+      mediaUrl: input.mediaUrl || null,
+      sentAt: input.sentAt ?? new Date(),
+      deliveredAt: input.sentAt ?? new Date()
+    }
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversation.id },
+    data: {
+      contactName: input.contactName?.trim() || conversation.contactName,
+      patientId: conversation.patientId ?? patient?.id ?? null,
+      unreadCount: {
+        increment: 1
+      },
+      lastMessageAt: message.createdAt
+    }
+  });
+
+  return {
+    id: message.id,
+    direction: message.direction,
+    status: message.status,
+    content: message.content,
+    mediaUrl: message.mediaUrl,
+    createdAt: message.createdAt.toISOString()
+  };
 }
 
 export async function generateAiReplyForConversation(conversationId: string): Promise<ConversationMessage | null> {

@@ -141,6 +141,21 @@ async function fileToBase64(file: File) {
   });
 }
 
+async function blobToBase64(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const base64 = result.includes(",") ? result.split(",")[1] ?? "" : result;
+      resolve(base64);
+    };
+
+    reader.onerror = () => reject(new Error("Nao foi possivel converter o arquivo."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function renderFieldValue(value: string | string[] | boolean) {
   if (Array.isArray(value)) {
     return value.join(", ");
@@ -275,6 +290,7 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
   const [uploadSubmitting, setUploadSubmitting] = useState(false);
   const [anamnesisSubmitting, setAnamnesisSubmitting] = useState(false);
   const [contractLoading, setContractLoading] = useState(false);
+  const [contractSaving, setContractSaving] = useState(false);
   const [inlineMessage, setInlineMessage] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
 
@@ -533,6 +549,69 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
       setInlineError(error instanceof Error ? error.message : "Falha ao gerar o contrato.");
     } finally {
       setContractLoading(false);
+    }
+  }
+
+  async function handleSaveContractToRecord() {
+    if (!selectedContractTemplate) {
+      setInlineError("Selecione um modelo de contrato.");
+      return;
+    }
+
+    setContractSaving(true);
+    setInlineError(null);
+    setInlineMessage(null);
+
+    try {
+      const query = new URLSearchParams({
+        patientId: patient.id,
+        format: "pdf"
+      });
+
+      if (selectedBudgetId) {
+        query.set("budgetId", selectedBudgetId);
+      }
+
+      const response = await fetch(
+        `/api/settings/contracts/${selectedContractTemplate}/render?${query.toString()}`,
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message || "Nao foi possivel gerar o PDF do contrato.");
+      }
+
+      const blob = await response.blob();
+      const base64Content = await blobToBase64(blob);
+      const activeTemplate = contractTemplates.find((template) => template.id === selectedContractTemplate);
+      const fileName = `${activeTemplate?.name ?? "contrato"}-${patient.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+
+      const uploadResponse = await fetch(`/api/patients/${patient.id}/files`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: fileName,
+          type: "application/pdf",
+          category: "DOCUMENT",
+          base64Content
+        })
+      });
+
+      const uploadPayload = (await uploadResponse.json()) as { data?: LocalFile; message?: string };
+
+      if (!uploadResponse.ok || !uploadPayload.data) {
+        throw new Error(uploadPayload.message || "Nao foi possivel salvar o contrato no prontuario.");
+      }
+
+      setDocuments((current) => [uploadPayload.data!, ...current]);
+      setInlineMessage("Contrato salvo no prontuario do paciente.");
+    } catch (error) {
+      setInlineError(error instanceof Error ? error.message : "Falha ao salvar o contrato.");
+    } finally {
+      setContractSaving(false);
     }
   }
 
@@ -1357,6 +1436,15 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
               <Button type="button" variant="outline" onClick={() => void handleContractPreview(true)} disabled={contractLoading}>
                 <Download className="mr-2 size-4" />
                 Exportar PDF
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleSaveContractToRecord()}
+                disabled={contractSaving || contractLoading}
+              >
+                {contractSaving ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Upload className="mr-2 size-4" />}
+                Salvar no prontuario
               </Button>
             </div>
 

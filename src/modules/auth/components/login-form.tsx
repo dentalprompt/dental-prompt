@@ -71,9 +71,11 @@ export function LoginForm() {
           <Button type="submit" className="h-12 w-full rounded-xl" disabled={isSubmitting}>
             {isSubmitting ? "Entrando..." : "Acessar plataforma"}
           </Button>
-          <Button type="button" variant="outline" className="h-12 w-full rounded-xl">
-            <Chrome className="size-4" />
-            Entrar com o Google
+          <Button asChild type="button" variant="outline" className="h-12 w-full rounded-xl">
+            <Link href="/api/auth/google/start?mode=login">
+              <Chrome className="size-4" />
+              Entrar com o Google
+            </Link>
           </Button>
         </form>
         <div className="text-center text-sm text-slate-500">

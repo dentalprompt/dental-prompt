@@ -1,3 +1,5 @@
+import { getOpenAIClient, getOpenAIModel } from "@/lib/integrations/openai";
+import { sendEvolutionTextMessage } from "@/lib/integrations/evolution";
 import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockConversationDetails, mockConversations } from "@/modules/conversations/data/mock-conversations";
@@ -161,7 +163,8 @@ export async function sendMessage(input: SendMessageInput): Promise<Conversation
     where: { id: input.conversationId },
     select: {
       id: true,
-      tenantId: true
+      tenantId: true,
+      contactPhone: true
     }
   });
 
@@ -173,9 +176,31 @@ export async function sendMessage(input: SendMessageInput): Promise<Conversation
     data: {
       conversationId: conversation.id,
       direction: "OUTBOUND",
-      status: "SENT",
+      status: "PENDING",
       content: input.content,
       sentAt: new Date()
+    }
+  });
+
+  let nextStatus: "SENT" | "FAILED" = "SENT";
+
+  try {
+    const phone = scopedPhoneNumber(input.phoneOverride ?? conversation.contactPhone);
+
+    if (phone) {
+      await sendEvolutionTextMessage({
+        number: phone,
+        text: input.content
+      });
+    }
+  } catch {
+    nextStatus = "FAILED";
+  }
+
+  const updatedMessage = await prisma.message.update({
+    where: { id: message.id },
+    data: {
+      status: nextStatus
     }
   });
 
@@ -187,13 +212,108 @@ export async function sendMessage(input: SendMessageInput): Promise<Conversation
   });
 
   return {
-    id: message.id,
-    direction: message.direction,
-    status: message.status,
-    content: message.content,
-    mediaUrl: message.mediaUrl,
-    createdAt: message.createdAt.toISOString()
+    id: updatedMessage.id,
+    direction: updatedMessage.direction,
+    status: updatedMessage.status,
+    content: updatedMessage.content,
+    mediaUrl: updatedMessage.mediaUrl,
+    createdAt: updatedMessage.createdAt.toISOString()
   };
+}
+
+function scopedPhoneNumber(phone?: string | null) {
+  if (!phone) {
+    return "";
+  }
+
+  return phone.replace(/\D/g, "");
+}
+
+export async function generateAiReplyForConversation(conversationId: string): Promise<ConversationMessage | null> {
+  if (!process.env.DATABASE_URL) {
+    return {
+      id: `mock_ai_${Date.now()}`,
+      direction: "OUTBOUND",
+      status: "SENT",
+      content: "Oi! Posso te ajudar com seu agendamento, valores ou retorno de tratamento.",
+      mediaUrl: null,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  const tenantId = await resolveTenantId();
+
+  if (!tenantId) {
+    return null;
+  }
+
+  const [conversation, activeAgent] = await Promise.all([
+    prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: "asc"
+          },
+          take: 20
+        },
+        patient: true
+      }
+    }),
+    prisma.agent.findFirst({
+      where: {
+        tenantId,
+        status: "ACTIVE"
+      },
+      orderBy: {
+        updatedAt: "desc"
+      }
+    })
+  ]);
+
+  if (!conversation || conversation.tenantId !== tenantId) {
+    return null;
+  }
+
+  const client = getOpenAIClient();
+
+  if (!client) {
+    return null;
+  }
+
+  const systemPrompt = activeAgent?.promptBase?.trim()
+    ? activeAgent.promptBase
+    : "Voce e um assistente cordial de uma clinica odontologica. Responda em portugues do Brasil, com objetividade, tom humano e foco em atendimento.";
+
+  const patientContext = conversation.patient
+    ? `Paciente vinculado: ${conversation.patient.fullName}. Prontuario: ${conversation.patient.chartNumber ?? "nao informado"}.`
+    : "Nao existe paciente vinculado a esta conversa.";
+
+  const response = await client.responses.create({
+    model: activeAgent?.model || getOpenAIModel(),
+    temperature: activeAgent?.temperature ?? 0.2,
+    input: [
+      {
+        role: "system",
+        content: `${systemPrompt}\n${patientContext}`
+      },
+      ...conversation.messages.map((message) => ({
+        role: message.direction === "INBOUND" ? ("user" as const) : ("assistant" as const),
+        content: message.content || ""
+      }))
+    ]
+  });
+
+  const aiText =
+    response.output_text?.trim() ||
+    activeAgent?.initialMessage?.trim() ||
+    "Oi! Estou aqui para te ajudar com seu atendimento.";
+
+  return sendMessage({
+    conversationId,
+    content: aiText,
+    phoneOverride: conversation.contactPhone
+  });
 }
 
 export async function createConversation(input: ConversationUpsertInput) {

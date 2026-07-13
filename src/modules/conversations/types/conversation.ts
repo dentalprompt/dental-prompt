@@ -45,6 +45,7 @@ export type ConversationDetail = {
 export type SendMessageInput = {
   conversationId: string;
   content: string;
+  phoneOverride?: string;
 };
 
 export type ConversationUpsertInput = {

@@ -1,11 +1,8 @@
-import { randomUUID } from "crypto";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { recordAuditLog } from "@/lib/audit/audit-log";
-import { ACCESS_TOKEN_TTL, AUTH_COOKIE_NAME, REFRESH_TOKEN_TTL, REFRESH_COOKIE_NAME } from "@/lib/auth/constants";
-import { signAccessToken } from "@/lib/auth/jwt";
+import { issueSessionResponse } from "@/lib/auth/session-issuer";
 import { comparePassword, hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import { loginSchema } from "@/modules/auth/schemas/login-schema";
@@ -178,68 +175,6 @@ async function ensureSeedUser(email: string) {
   return user;
 }
 
-async function createSessionResponse({
-  userId,
-  tenantId,
-  email,
-  isSuperAdmin,
-  roles,
-  persistSession
-}: {
-  userId: string;
-  tenantId?: string;
-  email: string;
-  isSuperAdmin: boolean;
-  roles: string[];
-  persistSession: boolean;
-}) {
-  const accessToken = signAccessToken(
-    {
-      sub: userId,
-      tenantId,
-      email,
-      isSuperAdmin,
-      roles
-    },
-    ACCESS_TOKEN_TTL
-  );
-
-  const refreshToken = randomUUID();
-
-  if (persistSession) {
-    await prisma.session.create({
-      data: {
-        userId,
-        refreshToken,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL * 1000)
-      }
-    });
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { lastLoginAt: new Date() }
-    });
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.set(AUTH_COOKIE_NAME, accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: ACCESS_TOKEN_TTL
-  });
-  cookieStore.set(REFRESH_COOKIE_NAME, refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: REFRESH_TOKEN_TTL
-  });
-
-  return NextResponse.json({ ok: true, mode: persistSession ? "database" : "preview" });
-}
-
 export async function POST(request: Request) {
   let parsedValues: ReturnType<typeof loginSchema.parse> | null = null;
 
@@ -254,7 +189,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
       }
 
-      return createSessionResponse({
+      return issueSessionResponse({
         userId: previewUser.id,
         tenantId: previewUser.tenantId,
         email: previewUser.email,
@@ -305,7 +240,7 @@ export async function POST(request: Request) {
       recordId: user.id,
       result: "success"
     });
-    return createSessionResponse({
+    return issueSessionResponse({
       userId: user.id,
       tenantId: user.tenantId ?? undefined,
       email: user.email,
@@ -322,7 +257,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
       }
 
-      return createSessionResponse({
+      return issueSessionResponse({
         userId: previewUser.id,
         tenantId: previewUser.tenantId,
         email: previewUser.email,

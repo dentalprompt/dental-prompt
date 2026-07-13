@@ -122,9 +122,11 @@ export function RegisterForm() {
           <Button type="submit" className="h-12 w-full rounded-xl" disabled={isSubmitting}>
             {isSubmitting ? "Cadastrando..." : "Cadastrar"}
           </Button>
-          <Button type="button" variant="outline" className="h-12 w-full rounded-xl">
-            <Chrome className="size-4" />
-            Cadastrar com o Google
+          <Button asChild type="button" variant="outline" className="h-12 w-full rounded-xl">
+            <Link href="/api/auth/google/start?mode=register">
+              <Chrome className="size-4" />
+              Cadastrar com o Google
+            </Link>
           </Button>
         </form>
         <div className="text-center text-sm text-slate-500">

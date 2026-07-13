@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Download, FileText, Filter, ImageIcon, LoaderCircle, MessageCircle, PencilLine, Plus, ShieldAlert, Stethoscope, Upload, Wallet } from "lucide-react";
+import { CheckCircle2, Download, FileText, Filter, ImageIcon, LoaderCircle, MessageCircle, PencilLine, Plus, ShieldAlert, Stethoscope, Upload, Wallet } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -153,6 +153,11 @@ function renderFieldValue(value: string | string[] | boolean) {
   return value;
 }
 
+function buildToothActionLabel(tooth: string) {
+  const normalized = normalizeToothLabel(tooth);
+  return /^\d{2}$/.test(normalized) ? `Dente ${normalized}` : normalized;
+}
+
 function ToothButton({
   tooth,
   selected,
@@ -248,6 +253,7 @@ function OdontogramCard({
 
 export function PatientRecord({ patient }: { patient: PatientDetail }) {
   const [selectedTooth, setSelectedTooth] = useState("all");
+  const [selectedBudgetCardId, setSelectedBudgetCardId] = useState(patient.budgets[0]?.id ?? "");
   const [images, setImages] = useState<LocalFile[]>(patient.images);
   const [documents, setDocuments] = useState<LocalFile[]>(patient.documents);
   const [anamnesisSummary, setAnamnesisSummary] = useState(patient.anamnesisSummary);
@@ -286,6 +292,7 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
   );
   const overdueDebts = patient.debts.filter((debt) => debt.status === "OVERDUE").length;
   const totalBudgeted = patient.budgets.reduce((sum, budget) => sum + budget.finalValue, 0);
+  const selectedBudgetCard = patient.budgets.find((budget) => budget.id === selectedBudgetCardId) ?? filteredBudgets[0] ?? null;
 
   useEffect(() => {
     let active = true;
@@ -707,61 +714,179 @@ export function PatientRecord({ patient }: { patient: PatientDetail }) {
           <div className="space-y-4">
             <OdontogramCard selectedTooth={selectedTooth} onSelectTooth={setSelectedTooth} activeTeeth={activeTeeth} />
 
-            <Card className="border-white/70 bg-white/92">
-              <CardHeader>
-                <CardTitle>Orcamentos</CardTitle>
-                <CardDescription>Estrutura pronta para criar, editar, duplicar e converter em tratamento.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                {filteredBudgets.length ? (
-                  filteredBudgets.map((budget) => (
-                    <div key={budget.id} className="rounded-[1.25rem] border border-border bg-background p-5">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-slate-950">{budget.number}</p>
-                          <p className="text-sm text-slate-500">
-                            {budget.professional} • {budget.plan} • {formatDateOnly(budget.date)}
-                          </p>
-                          <p className="text-sm leading-6 text-slate-600">{budget.description}</p>
-                        </div>
-                        <Badge>{budgetStatus[budget.status]}</Badge>
-                      </div>
-                      <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                        <p><span className="font-medium text-slate-950">Valor total:</span> {formatCurrency(budget.value)}</p>
-                        <p><span className="font-medium text-slate-950">Valor final:</span> {formatCurrency(budget.finalValue)}</p>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {budget.teeth.length ? (
-                          budget.teeth.map((tooth) => (
-                            <button
-                              key={`${budget.id}-${tooth}`}
+            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+              <Card className="border-white/70 bg-white/92">
+                <CardHeader>
+                  <CardTitle>Orcamentos</CardTitle>
+                  <CardDescription>Selecione um orcamento e use os botoes dos dentes para navegar no planejamento clinico.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                  {filteredBudgets.length ? (
+                    filteredBudgets.map((budget) => {
+                      const isSelectedBudget = budget.id === selectedBudgetCardId;
+
+                      return (
+                        <div
+                          key={budget.id}
+                          className={[
+                            "rounded-[1.25rem] border bg-background p-5 transition-all",
+                            isSelectedBudget ? "border-primary shadow-soft" : "border-border"
+                          ].join(" ")}
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-semibold text-slate-950">{budget.number}</p>
+                                {isSelectedBudget ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-primary">
+                                    <CheckCircle2 className="size-3.5" />
+                                    Em foco
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="text-sm text-slate-500">
+                                {budget.professional} • {budget.plan} • {formatDateOnly(budget.date)}
+                              </p>
+                              <p className="text-sm leading-6 text-slate-600">{budget.description}</p>
+                            </div>
+                            <Badge>{budgetStatus[budget.status]}</Badge>
+                          </div>
+
+                          <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                            <p><span className="font-medium text-slate-950">Valor total:</span> {formatCurrency(budget.value)}</p>
+                            <p><span className="font-medium text-slate-950">Valor final:</span> {formatCurrency(budget.finalValue)}</p>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <Button
                               type="button"
-                              onClick={() => setSelectedTooth(normalizeToothLabel(tooth))}
-                              className={[
-                                "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-                                normalizeToothLabel(tooth) === selectedTooth
-                                  ? "border-transparent bg-primary text-white"
-                                  : "border-cyan-100 bg-cyan-50/80 text-primary"
-                              ].join(" ")}
+                              variant={isSelectedBudget ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setSelectedBudgetCardId(budget.id);
+                                setSelectedBudgetId(budget.id);
+                              }}
                             >
-                              {tooth}
-                            </button>
-                          ))
-                        ) : (
-                          <span className="rounded-full border border-dashed border-border px-3 py-1 text-xs text-slate-500">
-                            Sem dentes vinculados
-                          </span>
-                        )}
+                              Selecionar orcamento
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedBudgetCardId(budget.id);
+                                setSelectedBudgetId(budget.id);
+                                setContractDialogOpen(true);
+                              }}
+                            >
+                              Gerar contrato
+                            </Button>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {budget.teeth.length ? (
+                              budget.teeth.map((tooth) => (
+                                <Button
+                                  key={`${budget.id}-${tooth}`}
+                                  type="button"
+                                  variant={normalizeToothLabel(tooth) === selectedTooth ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedBudgetCardId(budget.id);
+                                    setSelectedBudgetId(budget.id);
+                                    setSelectedTooth(normalizeToothLabel(tooth));
+                                  }}
+                                >
+                                  {buildToothActionLabel(tooth)}
+                                </Button>
+                              ))
+                            ) : (
+                              <span className="rounded-full border border-dashed border-border px-3 py-1 text-xs text-slate-500">
+                                Sem dentes vinculados
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      Nenhum orcamento encontrado para o filtro atual.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-white/70 bg-white/92">
+                <CardHeader>
+                  <CardTitle>Orcamento em foco</CardTitle>
+                  <CardDescription>Resumo rapido do orcamento selecionado para facilitar contrato, filtro clinico e acompanhamento.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedBudgetCard ? (
+                    <>
+                      <div className="rounded-[1.25rem] border border-border bg-background p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-950">{selectedBudgetCard.number}</p>
+                            <p className="text-sm text-slate-500">
+                              {selectedBudgetCard.professional} • {selectedBudgetCard.plan}
+                            </p>
+                          </div>
+                          <Badge>{budgetStatus[selectedBudgetCard.status]}</Badge>
+                        </div>
+
+                        <div className="mt-4 space-y-2 text-sm text-slate-600">
+                          <p><span className="font-medium text-slate-950">Data:</span> {formatDateOnly(selectedBudgetCard.date)}</p>
+                          <p><span className="font-medium text-slate-950">Valor final:</span> {formatCurrency(selectedBudgetCard.finalValue)}</p>
+                          <p><span className="font-medium text-slate-950">Descricao:</span> {selectedBudgetCard.description}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    Nenhum orcamento encontrado para o filtro atual.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+
+                      <div className="rounded-[1.25rem] border border-border bg-background p-5">
+                        <p className="text-sm font-medium text-slate-950">Dentes vinculados</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {selectedBudgetCard.teeth.length ? (
+                            selectedBudgetCard.teeth.map((tooth) => (
+                              <Button
+                                key={`selected-${selectedBudgetCard.id}-${tooth}`}
+                                type="button"
+                                variant={normalizeToothLabel(tooth) === selectedTooth ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setSelectedTooth(normalizeToothLabel(tooth))}
+                              >
+                                {buildToothActionLabel(tooth)}
+                              </Button>
+                            ))
+                          ) : (
+                            <p className="text-sm text-slate-500">Este orcamento ainda nao possui dentes relacionados.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setSelectedBudgetId(selectedBudgetCard.id);
+                            setContractDialogOpen(true);
+                          }}
+                        >
+                          <FileText className="mr-2 size-4" />
+                          Usar no contrato
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setSelectedTooth("all")}>
+                          <Filter className="mr-2 size-4" />
+                          Limpar filtro de dente
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-slate-500">Selecione um orcamento para visualizar o resumo detalhado.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 

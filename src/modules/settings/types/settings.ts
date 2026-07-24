@@ -10,6 +10,22 @@ export type ClinicSettingsView = {
   secondaryColor: string;
 };
 
+export type ZApiInstanceView = {
+  tenantId: string;
+  configured: boolean;
+  instanceId: string;
+  status: string;
+  connected: boolean;
+  smartphoneConnected: boolean;
+  connectedPhone: string;
+  profileName: string;
+  qrCodeBase64: string;
+  qrCodeText: string;
+  lastError: string;
+  webhookUrl: string;
+  updatedAt: string | null;
+};
+
 export type AnamnesisTemplateItem = {
   id: string;
   name: string;

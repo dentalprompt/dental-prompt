@@ -10,10 +10,8 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
-  EVOLUTION_API_URL: z.string().url().optional(),
-  EVOLUTION_API_KEY: z.string().min(1).optional(),
-  EVOLUTION_INSTANCE: z.string().min(1).optional(),
-  EVOLUTION_WEBHOOK_SECRET: z.string().min(1).optional()
+  Z_API_BASE_URL: z.string().url().optional(),
+  Z_API_WEBHOOK_BASE_URL: z.string().url().optional()
 });
 
 export const env = envSchema.parse({
@@ -26,8 +24,6 @@ export const env = envSchema.parse({
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
-  EVOLUTION_API_URL: process.env.EVOLUTION_API_URL,
-  EVOLUTION_API_KEY: process.env.EVOLUTION_API_KEY,
-  EVOLUTION_INSTANCE: process.env.EVOLUTION_INSTANCE,
-  EVOLUTION_WEBHOOK_SECRET: process.env.EVOLUTION_WEBHOOK_SECRET
+  Z_API_BASE_URL: process.env.Z_API_BASE_URL,
+  Z_API_WEBHOOK_BASE_URL: process.env.Z_API_WEBHOOK_BASE_URL
 });

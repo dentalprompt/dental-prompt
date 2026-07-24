@@ -139,6 +139,7 @@ model Tenant {
   serviceBoards  ServiceBoard[]
   agents         Agent[]
   settings       ClinicSettings?
+  zApiInstance   ZApiInstance?
   anamneses      AnamnesisTemplate[]
   contracts      ContractTemplate[]
   accounts       FinancialAccount[]
@@ -464,6 +465,28 @@ model ClinicSettings {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model ZApiInstance {
+  id                String    @id @default(cuid())
+  tenantId          String    @unique
+  instanceId        String
+  instanceToken     String
+  clientToken       String
+  status            String    @default("configured")
+  connected         Boolean   @default(false)
+  smartphoneConnected Boolean @default(false)
+  connectedPhone    String?
+  profileName       String?
+  qrCodeBase64      String?
+  qrCodeText        String?
+  lastError         String?
+  lastConnectedAt   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
 }
 
 model PatientBudget {

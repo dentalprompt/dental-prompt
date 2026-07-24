@@ -18,7 +18,7 @@ const highlights = [
   },
   {
     title: "Atendimento inteligente",
-    description: "Agentes com OpenAI e integracao com Evolution API preparados para escala.",
+    description: "Agentes com OpenAI e integracao com WhatsApp preparados para escala.",
     icon: MessageSquareMore
   }
 ];

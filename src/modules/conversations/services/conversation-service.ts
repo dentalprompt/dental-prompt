@@ -1,5 +1,5 @@
 import { getOpenAIClient, getOpenAIModel } from "@/lib/integrations/openai";
-import { sendEvolutionTextMessage } from "@/lib/integrations/evolution";
+import { sendZApiTextMessage } from "@/lib/integrations/zapi";
 import { resolveTenantId } from "@/lib/auth/tenant-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { mockConversationDetails, mockConversations } from "@/modules/conversations/data/mock-conversations";
@@ -198,7 +198,8 @@ export async function sendMessage(input: SendMessageInput): Promise<Conversation
     const phone = scopedPhoneNumber(input.phoneOverride ?? conversation.contactPhone);
 
     if (phone) {
-      await sendEvolutionTextMessage({
+      await sendZApiTextMessage({
+        tenantId,
         number: phone,
         text: input.content
       });

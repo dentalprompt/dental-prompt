@@ -1,7 +1,6 @@
 "use client";
 
-import { MessageSquareShare, QrCode } from "lucide-react";
-import Image from "next/image";
+import { CheckCircle2, MessageSquareShare } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -95,7 +94,7 @@ export function ZApiSettingsPanel() {
     }
   }
 
-  async function handleAction(action: "refresh-status" | "refresh-qrcode" | "sync-webhooks" | "disconnect") {
+  async function handleAction(action: "refresh-status" | "sync-webhooks" | "disconnect") {
     setIsSubmitting(true);
     setFeedback(null);
     setError(null);
@@ -122,9 +121,7 @@ export function ZApiSettingsPanel() {
         }));
       }
 
-      if (action === "refresh-qrcode") {
-        setFeedback("QR Code atualizado na Z-API.");
-      } else if (action === "sync-webhooks") {
+      if (action === "sync-webhooks") {
         setFeedback("Webhook registrado com sucesso na Z-API.");
       } else if (action === "disconnect") {
         setFeedback("Instancia desconectada da Z-API.");
@@ -143,7 +140,7 @@ export function ZApiSettingsPanel() {
           <Badge variant="success">WhatsApp</Badge>
           <CardTitle>Z-API por clinica</CardTitle>
           <CardDescription>
-            Configure aqui as credenciais da Z-API do tenant para enviar e receber mensagens pelo CRM.
+            Configure aqui as credenciais da Z-API do tenant. O pareamento do WhatsApp continua sendo feito no painel da própria Z-API.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -227,7 +224,7 @@ export function ZApiSettingsPanel() {
               <div className="space-y-2">
                 <p className="font-semibold text-slate-950">Fluxo rapido</p>
                 <p className="text-sm leading-6 text-slate-600">
-                  Cole as credenciais da Z-API, salve, registre o webhook e gere o QR Code. A partir disso, o CRM já consegue testar envio e retorno de mensagens.
+                  Cole as credenciais da Z-API, salve e registre o webhook. Depois conecte o número no painel da Z-API e volte aqui só para atualizar o status.
                 </p>
               </div>
             </div>
@@ -256,10 +253,6 @@ export function ZApiSettingsPanel() {
             <Button type="button" variant="outline" onClick={() => void handleAction("refresh-status")} disabled={isSubmitting || !zApi.configured}>
               Atualizar status
             </Button>
-            <Button type="button" variant="outline" onClick={() => void handleAction("refresh-qrcode")} disabled={isSubmitting || !zApi.configured}>
-              <QrCode className="size-4" />
-              Gerar QR
-            </Button>
             {zApi.configured ? (
               <Button type="button" variant="outline" onClick={() => void handleAction("disconnect")} disabled={isSubmitting}>
                 Desconectar
@@ -272,38 +265,49 @@ export function ZApiSettingsPanel() {
       <Card className="border-white/70 bg-white/92">
         <CardHeader className="space-y-2">
           <Badge variant="info">Pareamento</Badge>
-          <CardTitle>QR Code</CardTitle>
+          <CardTitle>Como conectar</CardTitle>
           <CardDescription>
-            Gere o QR Code por aqui e escaneie com o WhatsApp Business da clínica.
+            O QR Code fica no painel da Z-API. Use esta área como checklist da integração no CRM.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {zApi.qrCodeBase64 ? (
-            <div className="rounded-[1.5rem] border border-border bg-background p-4">
-              <Image
-                src={zApi.qrCodeBase64}
-                alt="QR Code do WhatsApp"
-                width={320}
-                height={320}
-                className="mx-auto w-full max-w-xs rounded-2xl"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-border bg-background p-6 text-sm leading-6 text-slate-500">
-              Depois de salvar as credenciais, clique em gerar QR. Se a instância já estiver conectada, basta atualizar o status.
-            </div>
-          )}
-
-          {zApi.qrCodeText ? (
+          <div className="space-y-3">
             <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <p className="text-sm text-slate-500">Leitura auxiliar</p>
-              <p className="mt-2 break-all font-semibold text-slate-950">{zApi.qrCodeText}</p>
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
+                <div>
+                  <p className="font-medium text-slate-950">1. Salve as credenciais no CRM</p>
+                  <p className="mt-1 text-sm text-slate-600">Preencha `Instance ID`, `Token da instância` e `Client Token` nesta tela.</p>
+                </div>
+              </div>
             </div>
-          ) : null}
-
-          <div className="rounded-[1.25rem] border border-border bg-background p-4 text-sm text-slate-600">
-            O QR Code pode expirar rápido. Se isso acontecer, clique em `Gerar QR` novamente.
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
+                <div>
+                  <p className="font-medium text-slate-950">2. Registre o webhook</p>
+                  <p className="mt-1 text-sm text-slate-600">Clique em `Registrar webhook` para a Z-API enviar eventos de conexão e mensagens para o Dental Prompt.</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
+                <div>
+                  <p className="font-medium text-slate-950">3. Conecte no painel da Z-API</p>
+                  <p className="mt-1 text-sm text-slate-600">Abra a instância no painel da Z-API e escaneie o QR Code por lá com o WhatsApp Business da clínica.</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
+                <div>
+                  <p className="font-medium text-slate-950">4. Volte e atualize o status</p>
+                  <p className="mt-1 text-sm text-slate-600">Depois do pareamento, clique em `Atualizar status` para confirmar a conexão dentro do CRM.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

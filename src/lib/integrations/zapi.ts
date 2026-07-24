@@ -28,7 +28,15 @@ type ZApiStoredInstance = {
 };
 
 function getZApiBaseUrl(apiBaseUrl?: string | null) {
-  return (apiBaseUrl ?? process.env.Z_API_BASE_URL ?? "https://api.z-api.io").replace(/\/$/, "");
+  const raw = (apiBaseUrl ?? process.env.Z_API_BASE_URL ?? "https://api.z-api.io").trim();
+  const withoutTrailingSlash = raw.replace(/\/$/, "");
+  const instanceMarker = withoutTrailingSlash.indexOf("/instances/");
+
+  if (instanceMarker >= 0) {
+    return withoutTrailingSlash.slice(0, instanceMarker);
+  }
+
+  return withoutTrailingSlash;
 }
 
 function getWebhookBaseUrl() {
@@ -212,16 +220,13 @@ export async function syncZApiWebhooks(tenantId: string) {
     throw new Error("Configure NEXT_PUBLIC_APP_URL ou Z_API_WEBHOOK_BASE_URL para registrar o webhook.");
   }
 
-  await Promise.all([
-    requestZApi(instance, "/update-webhook-connected", {
-      method: "PUT",
-      body: JSON.stringify({ value: webhookUrl })
-    }),
-    requestZApi(instance, "/update-webhook-received", {
-      method: "PUT",
-      body: JSON.stringify({ value: webhookUrl })
+  await requestZApi(instance, "/update-every-webhooks", {
+    method: "PUT",
+    body: JSON.stringify({
+      value: webhookUrl,
+      notifySentByMe: true
     })
-  ]);
+  });
 
   const updated = await updateStoredInstance(tenantId, {
     lastError: null

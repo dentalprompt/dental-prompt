@@ -1,13 +1,27 @@
 "use client";
 
-import { CheckCircle2, MessageSquareShare } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Link2, MessageSquareShare, Phone, PencilLine, ShieldCheck, Webhook } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { updateZApiSettingsSchema, type UpdateZApiSettingsFormValues } from "@/modules/settings/schemas/zapi-settings-schema";
 import type { ZApiInstanceView } from "@/modules/settings/types/settings";
 
 const initialZApiState: ZApiInstanceView = {
@@ -28,19 +42,55 @@ const initialZApiState: ZApiInstanceView = {
   updatedAt: null
 };
 
+function statusBadge(configured: boolean, connected: boolean) {
+  if (connected) {
+    return { label: "Ativo", variant: "success" as const };
+  }
+
+  if (configured) {
+    return { label: "Configurado", variant: "warning" as const };
+  }
+
+  return { label: "Pendente", variant: "info" as const };
+}
+
+function maskToken(value: string) {
+  if (!value) {
+    return "Nao informado";
+  }
+
+  if (value.length <= 8) {
+    return value;
+  }
+
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
 export function ZApiSettingsPanel() {
+  const router = useRouter();
   const [zApi, setZApi] = useState<ZApiInstanceView>(initialZApiState);
-  const [credentials, setCredentials] = useState({
-    apiBaseUrl: "",
-    instanceId: "",
-    instanceToken: "",
-    clientToken: "",
-    whatsappNumber: ""
-  });
+  const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors, isSubmitting }
+  } = useForm<UpdateZApiSettingsFormValues>({
+    resolver: zodResolver(updateZApiSettingsSchema),
+    defaultValues: {
+      apiBaseUrl: "",
+      instanceId: "",
+      instanceToken: "",
+      clientToken: "",
+      whatsappNumber: ""
+    }
+  });
 
   const loadZApi = useCallback(async () => {
     setIsLoading(true);
@@ -50,60 +100,61 @@ export function ZApiSettingsPanel() {
       const payload = (await response.json()) as { data?: ZApiInstanceView; message?: string };
 
       if (!response.ok) {
-        setError(payload.message ?? "Nao foi possivel carregar a integracao WhatsApp.");
+        setServerError(payload.message ?? "Nao foi possivel carregar a configuracao da Z-API.");
         return;
       }
 
       const nextValue = payload.data ?? initialZApiState;
       setZApi(nextValue);
-      setCredentials((current) => ({
-        apiBaseUrl: current.apiBaseUrl || nextValue.apiBaseUrl || "",
-        instanceId: current.instanceId || nextValue.instanceId || "",
-        instanceToken: current.instanceToken,
-        clientToken: current.clientToken,
-        whatsappNumber: current.whatsappNumber || nextValue.whatsappNumber || ""
-      }));
-      setError(null);
+      reset({
+        apiBaseUrl: nextValue.apiBaseUrl,
+        instanceId: nextValue.instanceId,
+        instanceToken: "",
+        clientToken: "",
+        whatsappNumber: nextValue.whatsappNumber
+      });
+      setServerError(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [reset]);
 
   useEffect(() => {
     void loadZApi();
   }, [loadZApi]);
 
-  async function handleSaveCredentials() {
-    setIsSubmitting(true);
+  const badge = statusBadge(zApi.configured, zApi.connected);
+
+  const onSubmit = handleSubmit(async (values) => {
+    setServerError(null);
     setFeedback(null);
-    setError(null);
 
-    try {
-      const response = await fetch("/api/settings/zapi", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(credentials)
-      });
-      const payload = (await response.json()) as { data?: ZApiInstanceView; message?: string };
+    const response = await fetch("/api/settings/zapi", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(values)
+    });
 
-      if (!response.ok) {
-        setError(payload.message ?? "Nao foi possivel salvar as credenciais da Z-API.");
-        return;
-      }
+    const payload = (await response.json()) as { data?: ZApiInstanceView; message?: string };
 
-      setZApi(payload.data ?? initialZApiState);
-      setFeedback("Credenciais salvas e webhook registrado na Z-API.");
-    } finally {
-      setIsSubmitting(false);
+    if (!response.ok) {
+      setServerError(payload.message ?? "Nao foi possivel salvar as credenciais da Z-API.");
+      return;
     }
-  }
 
-  async function handleAction(action: "refresh-status" | "sync-webhooks" | "disconnect") {
-    setIsSubmitting(true);
+    setZApi(payload.data ?? initialZApiState);
+    setFeedback("Configuracao da Z-API salva com sucesso.");
+    setOpen(false);
+    router.refresh();
+    await loadZApi();
+  });
+
+  async function handleAction(action: "sync-webhooks" | "refresh-status" | "disconnect") {
+    setIsSyncing(true);
+    setServerError(null);
     setFeedback(null);
-    setError(null);
 
     try {
       const response = await fetch("/api/settings/zapi", {
@@ -113,247 +164,173 @@ export function ZApiSettingsPanel() {
         },
         body: JSON.stringify({ action })
       });
+
       const payload = (await response.json()) as { data?: ZApiInstanceView; message?: string };
 
       if (!response.ok) {
-        setError(payload.message ?? "Nao foi possivel executar a acao na Z-API.");
+        setServerError(payload.message ?? "Nao foi possivel executar a acao da Z-API.");
         return;
       }
 
-      if (payload.data) {
-        setZApi((current) => ({
-          ...current,
-          ...payload.data
-        }));
-      }
-
-      if (action === "sync-webhooks") {
-        setFeedback("Webhook registrado com sucesso na Z-API.");
-      } else if (action === "disconnect") {
-        setFeedback("Instancia desconectada da Z-API.");
-      } else {
-        setFeedback("Status atualizado com sucesso.");
-      }
+      setZApi(payload.data ?? initialZApiState);
+      setFeedback(
+        action === "sync-webhooks"
+          ? "Webhook sincronizado com sucesso."
+          : action === "disconnect"
+            ? "Instancia desconectada."
+            : "Status atualizado com sucesso."
+      );
     } finally {
-      setIsSubmitting(false);
+      setIsSyncing(false);
     }
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+    <div className="space-y-4">
       <Card className="border-white/70 bg-white/92">
-        <CardHeader className="space-y-2">
-          <Badge variant="success">WhatsApp</Badge>
-          <CardTitle>Z-API por clinica</CardTitle>
-          <CardDescription>
-            Configure aqui as credenciais da Z-API do tenant. O pareamento do WhatsApp continua sendo feito no painel da própria Z-API.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="space-y-5 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-semibold text-slate-950">Z-API da Clinica</h3>
+                <Badge variant={badge.variant}>{badge.label}</Badge>
+              </div>
+              <p className="text-sm leading-6 text-slate-500">
+                Configure a instância oficial do WhatsApp da clínica e acompanhe o webhook do CRM nesta mesma área.
+              </p>
+            </div>
+            <span className="rounded-2xl bg-accent p-3 text-primary">
+              <MessageSquareShare className="size-5" />
+            </span>
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-4 sm:grid-cols-2">
             <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <p className="text-sm text-slate-500">Status da integraçao</p>
-              <p className="mt-2 font-medium text-slate-950">
-                {zApi.configured ? "Credenciais salvas" : "Pendente de configuracao"}
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">API</p>
+              <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-950">
+                <Link2 className="size-4 text-primary" />
+                {zApi.apiBaseUrl || "Nao informado"}
               </p>
             </div>
             <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <p className="text-sm text-slate-500">Estado da conexao</p>
-              <p className="mt-2 font-medium capitalize text-slate-950">
-                {isLoading ? "Carregando..." : zApi.status || "Nao iniciado"}
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Instancia</p>
+              <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-950">
+                <ShieldCheck className="size-4 text-primary" />
+                {zApi.instanceId || "Nao informado"}
               </p>
             </div>
             <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <p className="text-sm text-slate-500">API da instância</p>
-              <p className="mt-2 break-all font-medium text-slate-950">
-                {zApi.apiBaseUrl || "https://api.z-api.io"}
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Numero</p>
+              <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-950">
+                <Phone className="size-4 text-primary" />
+                {zApi.whatsappNumber || zApi.connectedPhone || "Nao informado"}
               </p>
             </div>
             <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <p className="text-sm text-slate-500">Instance ID</p>
-              <p className="mt-2 break-all font-medium text-slate-950">
-                {zApi.instanceId || "Informe o ID da instância da sua conta Z-API"}
-              </p>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <p className="text-sm text-slate-500">Numero do WhatsApp</p>
-              <p className="mt-2 break-all font-medium text-slate-950">
-                {zApi.whatsappNumber || "Informe o numero da clinica"}
-              </p>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <p className="text-sm text-slate-500">Webhook do tenant</p>
-              <p className="mt-2 break-all text-sm text-slate-700">
-                {zApi.webhookUrl || "Defina NEXT_PUBLIC_APP_URL ou Z_API_WEBHOOK_BASE_URL"}
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Webhook</p>
+              <p className="mt-2 flex items-center gap-2 break-all text-sm font-semibold text-slate-950">
+                <Webhook className="size-4 shrink-0 text-primary" />
+                {zApi.webhookUrl || "Nao informado"}
               </p>
             </div>
           </div>
 
-          <div className="grid gap-4 rounded-[1.5rem] border border-border bg-background p-5 md:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="zapi-api-base-url">API da instância</Label>
-              <Input
-                id="zapi-api-base-url"
-                placeholder="https://api.z-api.io"
-                value={credentials.apiBaseUrl}
-                onChange={(event) =>
-                  setCredentials((current) => ({
-                    ...current,
-                    apiBaseUrl: event.target.value
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zapi-instance-id">Instance ID</Label>
-              <Input
-                id="zapi-instance-id"
-                placeholder="ID da instância"
-                value={credentials.instanceId}
-                onChange={(event) =>
-                  setCredentials((current) => ({
-                    ...current,
-                    instanceId: event.target.value
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zapi-instance-token">Token da instância</Label>
-              <Input
-                id="zapi-instance-token"
-                placeholder="Token da instância"
-                value={credentials.instanceToken}
-                onChange={(event) =>
-                  setCredentials((current) => ({
-                    ...current,
-                    instanceToken: event.target.value
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zapi-client-token">Client Token</Label>
-              <Input
-                id="zapi-client-token"
-                placeholder="Client Token"
-                value={credentials.clientToken}
-                onChange={(event) =>
-                  setCredentials((current) => ({
-                    ...current,
-                    clientToken: event.target.value
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zapi-whatsapp-number">Numero do WhatsApp</Label>
-              <Input
-                id="zapi-whatsapp-number"
-                placeholder="5511999999999"
-                value={credentials.whatsappNumber}
-                onChange={(event) =>
-                  setCredentials((current) => ({
-                    ...current,
-                    whatsappNumber: event.target.value
-                  }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[1.5rem] border border-border bg-background p-5">
-            <div className="flex items-start gap-3">
-              <span className="rounded-2xl bg-accent p-3 text-primary">
-                <MessageSquareShare className="size-5" />
-              </span>
-              <div className="space-y-2">
-                <p className="font-semibold text-slate-950">Fluxo rapido</p>
-                <p className="text-sm leading-6 text-slate-600">
-                  Cole as credenciais da Z-API, salve e registre o webhook. Depois conecte o número no painel da Z-API e volte aqui só para atualizar o status.
-                </p>
+          <div className="rounded-[1.25rem] border border-border bg-background p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Resumo</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div>
+                <p className="text-sm text-slate-500">Status</p>
+                <p className="font-semibold text-slate-950">{isLoading ? "Carregando..." : zApi.status}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Conexao do aparelho</p>
+                <p className="font-semibold text-slate-950">{zApi.smartphoneConnected ? "Online" : "Desconectado"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Ultima atualizacao</p>
+                <p className="font-semibold text-slate-950">{zApi.updatedAt ? new Date(zApi.updatedAt).toLocaleString("pt-BR") : "Nao disponivel"}</p>
               </div>
             </div>
           </div>
 
-          {zApi.connected ? (
-            <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
-              <p className="font-semibold text-emerald-900">Numero conectado</p>
-              <p className="mt-2 text-sm text-emerald-800">
-                {zApi.profileName || "WhatsApp conectado"} {zApi.connectedPhone ? `• ${zApi.connectedPhone}` : ""}
-              </p>
-            </div>
-          ) : null}
-
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
           {feedback ? <p className="text-sm text-emerald-600">{feedback}</p> : null}
           {zApi.lastError ? <p className="text-sm text-amber-600">{zApi.lastError}</p> : null}
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={handleSaveCredentials} disabled={isSubmitting}>
-              {isSubmitting ? "Processando..." : "Salvar credenciais"}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <PencilLine className="mr-2 size-4" />
+                  Configurar Z-API
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Configurar Z-API</DialogTitle>
+                  <DialogDescription>
+                    Fluxo oficial validado na documentação da Z-API: `send-text`, `status` e atualização de webhook por instância.
+                  </DialogDescription>
+                </DialogHeader>
+                <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="apiBaseUrl">API da instância</Label>
+                    <Input id="apiBaseUrl" placeholder="https://api.z-api.io/instances/.../token/.../send-text" {...register("apiBaseUrl")} />
+                    {errors.apiBaseUrl ? <p className="text-sm text-destructive">{errors.apiBaseUrl.message}</p> : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="instanceId">ID da instância</Label>
+                    <Input id="instanceId" placeholder="3F588942..." {...register("instanceId")} />
+                    {errors.instanceId ? <p className="text-sm text-destructive">{errors.instanceId.message}</p> : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsappNumber">WhatsApp</Label>
+                    <Input id="whatsappNumber" placeholder="5511999999999" {...register("whatsappNumber")} />
+                    {errors.whatsappNumber ? <p className="text-sm text-destructive">{errors.whatsappNumber.message}</p> : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="instanceToken">Token da instância</Label>
+                    <Input id="instanceToken" placeholder={maskToken(watch("instanceToken") || "")} {...register("instanceToken")} />
+                    {errors.instanceToken ? <p className="text-sm text-destructive">{errors.instanceToken.message}</p> : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clientToken">Client Token</Label>
+                    <Input id="clientToken" placeholder={maskToken(watch("clientToken") || "")} {...register("clientToken")} />
+                    {errors.clientToken ? <p className="text-sm text-destructive">{errors.clientToken.message}</p> : null}
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="webhookPreview">Webhook do CRM</Label>
+                    <Textarea id="webhookPreview" value={zApi.webhookUrl || "Nao disponivel"} readOnly />
+                  </div>
+
+                  {serverError ? <p className="text-sm text-destructive sm:col-span-2">{serverError}</p> : null}
+
+                  <DialogFooter className="sm:col-span-2">
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? "Salvando..." : "Salvar configuracao"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Button type="button" variant="outline" onClick={() => void handleAction("sync-webhooks")} disabled={isSyncing || !zApi.configured}>
+              Sincronizar webhook
             </Button>
-            <Button type="button" variant="outline" onClick={() => void handleAction("sync-webhooks")} disabled={isSubmitting || !zApi.configured}>
-              Registrar webhook
-            </Button>
-            <Button type="button" variant="outline" onClick={() => void handleAction("refresh-status")} disabled={isSubmitting || !zApi.configured}>
+            <Button type="button" variant="outline" onClick={() => void handleAction("refresh-status")} disabled={isSyncing || !zApi.configured}>
               Atualizar status
             </Button>
-            {zApi.configured ? (
-              <Button type="button" variant="outline" onClick={() => void handleAction("disconnect")} disabled={isSubmitting}>
-                Desconectar
-              </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-white/70 bg-white/92">
-        <CardHeader className="space-y-2">
-          <Badge variant="info">Pareamento</Badge>
-          <CardTitle>Como conectar</CardTitle>
-          <CardDescription>
-            O QR Code fica no painel da Z-API. Use esta área como checklist da integração no CRM.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
-                <div>
-                  <p className="font-medium text-slate-950">1. Salve as credenciais no CRM</p>
-                  <p className="mt-1 text-sm text-slate-600">Preencha `API da instância`, `Instance ID`, `Token da instância`, `Client Token` e `Número do WhatsApp` nesta tela.</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
-                <div>
-                  <p className="font-medium text-slate-950">2. Registre o webhook</p>
-                  <p className="mt-1 text-sm text-slate-600">Clique em `Registrar webhook` para a Z-API enviar eventos de conexão e mensagens para o Dental Prompt.</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
-                <div>
-                  <p className="font-medium text-slate-950">3. Conecte no painel da Z-API</p>
-                  <p className="mt-1 text-sm text-slate-600">Abra a instância no painel da Z-API e escaneie o QR Code por lá com o WhatsApp Business da clínica.</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-border bg-background p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 size-5 text-primary" />
-                <div>
-                  <p className="font-medium text-slate-950">4. Volte e atualize o status</p>
-                  <p className="mt-1 text-sm text-slate-600">Depois do pareamento, clique em `Atualizar status` para confirmar a conexão dentro do CRM.</p>
-                </div>
-              </div>
-            </div>
+            <Button type="button" variant="outline" onClick={() => void handleAction("disconnect")} disabled={isSyncing || !zApi.configured}>
+              Desconectar instancia
+            </Button>
           </div>
         </CardContent>
       </Card>

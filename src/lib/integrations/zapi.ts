@@ -10,9 +10,11 @@ type SendZApiMessageInput = {
 
 type ZApiStoredInstance = {
   tenantId: string;
+  apiBaseUrl: string | null;
   instanceId: string;
   instanceToken: string;
   clientToken: string;
+  whatsappNumber: string | null;
   status: string;
   connected: boolean;
   smartphoneConnected: boolean;
@@ -25,8 +27,8 @@ type ZApiStoredInstance = {
   updatedAt: Date;
 };
 
-function getZApiBaseUrl() {
-  return (process.env.Z_API_BASE_URL ?? "https://api.z-api.io").replace(/\/$/, "");
+function getZApiBaseUrl(apiBaseUrl?: string | null) {
+  return (apiBaseUrl ?? process.env.Z_API_BASE_URL ?? "https://api.z-api.io").replace(/\/$/, "");
 }
 
 function getWebhookBaseUrl() {
@@ -50,11 +52,11 @@ function buildZApiHeaders(instance: { clientToken: string }) {
 }
 
 async function requestZApi(
-  instance: Pick<ZApiStoredInstance, "instanceId" | "instanceToken" | "clientToken">,
+  instance: Pick<ZApiStoredInstance, "apiBaseUrl" | "instanceId" | "instanceToken" | "clientToken">,
   path: string,
   init?: RequestInit
 ) {
-  const response = await fetch(`${getZApiBaseUrl()}/instances/${instance.instanceId}/token/${instance.instanceToken}${path}`, {
+  const response = await fetch(`${getZApiBaseUrl(instance.apiBaseUrl)}/instances/${instance.instanceId}/token/${instance.instanceToken}${path}`, {
     ...init,
     headers: {
       ...buildZApiHeaders(instance),
@@ -87,7 +89,9 @@ function toZApiView(tenantId: string, record: ZApiStoredInstance | null): ZApiIn
   return {
     tenantId,
     configured: Boolean(record),
+    apiBaseUrl: record?.apiBaseUrl ?? "",
     instanceId: record?.instanceId ?? "",
+    whatsappNumber: record?.whatsappNumber ?? "",
     status: record?.status ?? "not_configured",
     connected: record?.connected ?? false,
     smartphoneConnected: record?.smartphoneConnected ?? false,
@@ -112,16 +116,20 @@ export async function saveZApiCredentials(tenantId: string, values: UpdateZApiSe
   const instance = await prisma.zApiInstance.upsert({
     where: { tenantId },
     update: {
+      apiBaseUrl: values.apiBaseUrl.trim() || null,
       instanceId: values.instanceId.trim(),
       instanceToken: values.instanceToken.trim(),
       clientToken: values.clientToken.trim(),
+      whatsappNumber: normalizePhone(values.whatsappNumber) || null,
       lastError: null
     },
     create: {
       tenantId,
+      apiBaseUrl: values.apiBaseUrl.trim() || null,
       instanceId: values.instanceId.trim(),
       instanceToken: values.instanceToken.trim(),
-      clientToken: values.clientToken.trim()
+      clientToken: values.clientToken.trim(),
+      whatsappNumber: normalizePhone(values.whatsappNumber) || null
     }
   });
 

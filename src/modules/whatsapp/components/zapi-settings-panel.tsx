@@ -13,7 +13,9 @@ import type { ZApiInstanceView } from "@/modules/settings/types/settings";
 const initialZApiState: ZApiInstanceView = {
   tenantId: "",
   configured: false,
+  apiBaseUrl: "",
   instanceId: "",
+  whatsappNumber: "",
   status: "not_configured",
   connected: false,
   smartphoneConnected: false,
@@ -29,9 +31,11 @@ const initialZApiState: ZApiInstanceView = {
 export function ZApiSettingsPanel() {
   const [zApi, setZApi] = useState<ZApiInstanceView>(initialZApiState);
   const [credentials, setCredentials] = useState({
+    apiBaseUrl: "",
     instanceId: "",
     instanceToken: "",
-    clientToken: ""
+    clientToken: "",
+    whatsappNumber: ""
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,9 +57,11 @@ export function ZApiSettingsPanel() {
       const nextValue = payload.data ?? initialZApiState;
       setZApi(nextValue);
       setCredentials((current) => ({
+        apiBaseUrl: current.apiBaseUrl || nextValue.apiBaseUrl || "",
         instanceId: current.instanceId || nextValue.instanceId || "",
         instanceToken: current.instanceToken,
-        clientToken: current.clientToken
+        clientToken: current.clientToken,
+        whatsappNumber: current.whatsappNumber || nextValue.whatsappNumber || ""
       }));
       setError(null);
     } finally {
@@ -158,9 +164,21 @@ export function ZApiSettingsPanel() {
               </p>
             </div>
             <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">API da instância</p>
+              <p className="mt-2 break-all font-medium text-slate-950">
+                {zApi.apiBaseUrl || "https://api.z-api.io"}
+              </p>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
               <p className="text-sm text-slate-500">Instance ID</p>
               <p className="mt-2 break-all font-medium text-slate-950">
                 {zApi.instanceId || "Informe o ID da instância da sua conta Z-API"}
+              </p>
+            </div>
+            <div className="rounded-[1.25rem] border border-border bg-background p-4">
+              <p className="text-sm text-slate-500">Numero do WhatsApp</p>
+              <p className="mt-2 break-all font-medium text-slate-950">
+                {zApi.whatsappNumber || "Informe o numero da clinica"}
               </p>
             </div>
             <div className="rounded-[1.25rem] border border-border bg-background p-4">
@@ -171,7 +189,21 @@ export function ZApiSettingsPanel() {
             </div>
           </div>
 
-          <div className="grid gap-4 rounded-[1.5rem] border border-border bg-background p-5 md:grid-cols-3">
+          <div className="grid gap-4 rounded-[1.5rem] border border-border bg-background p-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="zapi-api-base-url">API da instância</Label>
+              <Input
+                id="zapi-api-base-url"
+                placeholder="https://api.z-api.io"
+                value={credentials.apiBaseUrl}
+                onChange={(event) =>
+                  setCredentials((current) => ({
+                    ...current,
+                    apiBaseUrl: event.target.value
+                  }))
+                }
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="zapi-instance-id">Instance ID</Label>
               <Input
@@ -210,6 +242,20 @@ export function ZApiSettingsPanel() {
                   setCredentials((current) => ({
                     ...current,
                     clientToken: event.target.value
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="zapi-whatsapp-number">Numero do WhatsApp</Label>
+              <Input
+                id="zapi-whatsapp-number"
+                placeholder="5511999999999"
+                value={credentials.whatsappNumber}
+                onChange={(event) =>
+                  setCredentials((current) => ({
+                    ...current,
+                    whatsappNumber: event.target.value
                   }))
                 }
               />
@@ -277,7 +323,7 @@ export function ZApiSettingsPanel() {
                 <CheckCircle2 className="mt-0.5 size-5 text-primary" />
                 <div>
                   <p className="font-medium text-slate-950">1. Salve as credenciais no CRM</p>
-                  <p className="mt-1 text-sm text-slate-600">Preencha `Instance ID`, `Token da instância` e `Client Token` nesta tela.</p>
+                  <p className="mt-1 text-sm text-slate-600">Preencha `API da instância`, `Instance ID`, `Token da instância`, `Client Token` e `Número do WhatsApp` nesta tela.</p>
                 </div>
               </div>
             </div>

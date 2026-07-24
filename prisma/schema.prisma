@@ -470,9 +470,11 @@ model ClinicSettings {
 model ZApiInstance {
   id                String    @id @default(cuid())
   tenantId          String    @unique
+  apiBaseUrl        String?
   instanceId        String
   instanceToken     String
   clientToken       String
+  whatsappNumber    String?
   status            String    @default("configured")
   connected         Boolean   @default(false)
   smartphoneConnected Boolean @default(false)

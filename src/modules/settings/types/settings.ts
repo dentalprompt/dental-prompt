@@ -13,7 +13,9 @@ export type ClinicSettingsView = {
 export type ZApiInstanceView = {
   tenantId: string;
   configured: boolean;
+  apiBaseUrl: string;
   instanceId: string;
+  whatsappNumber: string;
   status: string;
   connected: boolean;
   smartphoneConnected: boolean;
